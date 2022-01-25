@@ -1,0 +1,28 @@
+name: napari-morphodynamics
+display_name: MorphoPlugin
+contributions:
+  commands:
+    - id: napari-morphodynamics.make_sample_data
+      python_name: napari_morphodynamics._sample_data:make_sample_data
+      title: Load sample data from MorphoPlugin 
+    - id: napari-morphodynamics.make_qwidget
+      python_name: napari_morphodynamics._widget:ExampleQWidget
+      title: Make example QWidget
+    - id: napari-morphodynamics.make_magic_widget
+      python_name: napari_morphodynamics._widget:example_magic_widget
+      title: Make example magic widget
+    - id: napari-morphodynamics.make_func_widget
+      python_name: napari_morphodynamics._widget:example_function_widget
+      title: Make example function widget   
+  sample_data:
+    - command: napari-morphodynamics.make_sample_data
+      display_name: MorphoPlugin
+      key: unique_id.1 
+  widgets:
+    - command: napari-morphodynamics.make_qwidget
+      display_name: Example QWidget
+    - command: napari-morphodynamics.make_magic_widget
+      display_name: Example Magic Widget
+    - command: napari-morphodynamics.make_func_widget
+      autogenerate: true
+      display_name: Example Function Widget 
