@@ -7,22 +7,14 @@
 [![codecov](https://codecov.io/gh/guiwitz/napari-morphodynamics/branch/main/graph/badge.svg)](https://codecov.io/gh/guiwitz/napari-morphodynamics)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-morphodynamics)](https://napari-hub.org/plugins/napari-morphodynamics)
 
-Interface to run the morphodynamics package.
-
-----------------------------------
-
-This [napari] plugin was generated with [Cookiecutter] using [@napari]'s [cookiecutter-napari-plugin] template.
-
-<!--
-Don't miss the full getting started guide to set up your new package:
-https://github.com/napari/cookiecutter-napari-plugin#getting-started
-
-and review the napari docs for plugin developers:
-https://napari.org/plugins/stable/index.html
--->
-
+This plugin offers an interface for the [Morphodynamics](https://github.com/guiwitz/MorphoDynamics) package. It allows to select and visualize time-lapses, choose segmentation algorithm and parameters, train a pixel-classifier based segmentation (via [napari-convpaint](https://github.com/guiwitz/napari-convpaint)) and finally run the morphodynamics analysis (breaking up the segmentation into layered windows, fitting a spline on the contour).
 ## Installation
 
+You can install the plugin via pip with:
+
+```
+pip install pip install git+https://github.com/guiwitz/napari-morphodynamics
+**Not yet on pypi**
 You can install `napari-morphodynamics` via [pip]:
 
     pip install napari-morphodynamics
