@@ -2,16 +2,9 @@ name: napari-morphodynamics
 display_name: MorphoPlugin
 contributions:
   commands:
-    - id: napari-morphodynamics.make_sample_data
-      python_name: napari_morphodynamics._sample_data:make_sample_data
-      title: Load sample data from MorphoPlugin 
     - id: napari-morphodynamics.make_qwidget
       python_name: napari_morphodynamics.napari_gui:MorphoWidget
       title: Make MorphoWidget
-  sample_data:
-    - command: napari-morphodynamics.make_sample_data
-      display_name: MorphoPlugin
-      key: unique_id.1 
   widgets:
     - command: napari-morphodynamics.make_qwidget
       display_name: MorphoWidget

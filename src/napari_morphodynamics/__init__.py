@@ -6,6 +6,4 @@ except ImportError:
 
 
 
-
-from ._sample_data import make_sample_data 
 from .napari_gui import MorphoWidget
