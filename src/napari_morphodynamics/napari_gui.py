@@ -289,8 +289,10 @@ class MorphoWidget(QWidget):
         if self.segm_channel.currentItem() is not None:
             self.param.morpho_name = self.segm_channel.currentItem().text()
             self.conv_paint_widget.param.channel = self.param.morpho_name
-        if self.signal_channel.currentItem() is not None:
+        if len(self.signal_channel.selectedItems()) != 0:
             self.param.signal_name = [x.text() for x in self.signal_channel.selectedItems()]
+        else:
+            self.param.signal_name = []
         if self.file_list.folder_path is not None:
             self.param.data_folder = Path(self.file_list.folder_path)
         if self.display_analysis_folder.text() != 'No selection.':
