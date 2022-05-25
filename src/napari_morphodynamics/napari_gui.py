@@ -558,7 +558,7 @@ class MorphoWidget(QWidget):
                 self.layer_indices= self._get_layer_indices(windows)
 
             w_image[t, :, :] = label_windows(
-                shape=(self.data.shape[1], self.data.shape[2]), windows=windows)
+                shape=(self.data.shape[0], self.data.shape[1]), windows=windows)
 
         col_dict, self.layer_global_indices = self._create_color_shadings(self.layer_indices)
         
