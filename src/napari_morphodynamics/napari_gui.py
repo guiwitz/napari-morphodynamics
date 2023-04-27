@@ -6,9 +6,8 @@ by capturing views.
 import pickle
 from itertools import cycle
 from pathlib import Path
-from PyQt5.QtWidgets import QGridLayout
 from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox,
-QVBoxLayout, QLabel, QComboBox, QCheckBox,
+QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,
 QTabWidget, QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
 
 import numpy as np
@@ -21,6 +20,7 @@ from dask.distributed import Client, LocalCluster
 
 from .folder_list_widget import FolderListWidget
 from .VHGroup import VHGroup
+from .base_plot import DataPlotter
 
 from morphodynamics.store.parameters import Param
 from morphodynamics.utils import dataset_from_param, load_alldata, export_results_parameters
@@ -205,6 +205,8 @@ class MorphoWidget(QWidget):
         self.display_wlayers.itemSelectionChanged.connect(self._on_display_wlayers_selection_changed)
         self._display_options_layout.addWidget(QLabel('Window layers'), 0, 0)
         self._display_options_layout.addWidget(self.display_wlayers, 0, 1)
+        self.intensity_plot = DataPlotter(self.viewer)
+        self._display_options_layout.addWidget(self.intensity_plot, 1, 0, 1, 2)
 
         # dask options
         dask_group = VHGroup('Dask options', 'G')
@@ -266,6 +268,7 @@ class MorphoWidget(QWidget):
         self.btn_load_analysis.clicked.connect(self._on_load_analysis)
 
         self.file_list.model().rowsInserted.connect(self._on_change_filelist)
+        self.file_list.currentItemChanged.connect(self._on_select_file)
         self.cell_diameter.valueChanged.connect(self._on_update_param)
 
         self.dask_num_workers.valueChanged.connect(self._on_update_dask_wokers)
@@ -293,8 +296,14 @@ class MorphoWidget(QWidget):
             self.param.signal_name = [x.text() for x in self.signal_channel.selectedItems()]
         else:
             self.param.signal_name = []
-        if self.file_list.folder_path is not None:
-            self.param.data_folder = Path(self.file_list.folder_path)
+        
+        if self.param.data_type == 'zarr':
+            if self.file_list.currentItem() is not None:
+                self.param.data_folder = Path(self.file_list.folder_path).joinpath(self.file_list.currentItem().text())
+        else:
+            if self.file_list.folder_path is not None:
+                self.param.data_folder = Path(self.file_list.folder_path)
+        
         if self.display_analysis_folder.text() != 'No selection.':
             self.param.analysis_folder = Path(self.display_analysis_folder.text())
         if self.display_segmentation_folder.text() != 'No selection.':
@@ -317,6 +326,21 @@ class MorphoWidget(QWidget):
         self.segm_channel.addItems(files)
         self.signal_channel.addItems(files)
         self._on_update_param()
+
+    def _on_load_single_file_data(self):
+
+        channel_list = self.data.channel_name
+        self.segm_channel.clear()
+        self.signal_channel.clear()
+        self.segm_channel.addItems(channel_list)
+        self.signal_channel.addItems(channel_list)
+        self._on_update_param()
+
+    def _on_select_file(self):
+        
+        self.param.data_folder = Path(self.file_list.folder_path).joinpath(self.file_list.currentItem().text())
+        self.data, self.param = dataset_from_param(self.param)
+        self._on_load_single_file_data()
 
     def _on_load_model(self):
         self.param.random_forest = self.conv_paint_widget.param.random_forest
@@ -352,7 +376,9 @@ class MorphoWidget(QWidget):
         export_results_parameters(self.param, self.res)
 
     def _on_run_seg_spline(self):
-
+        
+        if self.analysis_path is None:
+            self._on_click_select_analysis()
         if self.param.seg_algo == 'conv_paint':
             self.load_convpaint_model(return_model=False)
         step = self.viewer.dims.current_step[0]
@@ -457,6 +483,17 @@ class MorphoWidget(QWidget):
             for j in self.layer_global_indices[i]:
                 self.viewer.layers['windows'].color[j][-1]=val_to_set
         self.viewer.layers['windows'].color_mode = 'direct'
+
+        self.intensity_plot.axes.clear()
+        self.intensity_plot.axes.set_title('Intensity')
+        self.intensity_plot.axes.set_xlabel('Time')
+        self.intensity_plot.axes.set_ylabel('Window')
+        self.intensity_plot.axes.imshow(
+            self.res.mean[0,on_list[0]],
+            vmin=np.percentile(self.res.mean[0,0],1),
+            vmax=np.percentile(self.res.mean[0,0],99))
+        self.intensity_plot.canvas.figure.canvas.draw()
+        
 
     def create_stacks(self):
         """Create and add to the viewer datasets as dask stacks.
@@ -579,7 +616,12 @@ class MorphoWidget(QWidget):
             self.analysis_path, load_results=True
         )
         self._on_update_interface()
-        self.file_list.update_from_path(self.param.data_folder)
+        if self.param.data_type == 'zarr':
+            main_folder = self.param.data_folder.parent
+        else:
+            main_folder = self.param.data_folder
+        
+        self.file_list.update_from_path(main_folder)
         self.create_stacks()
         self._on_load_windows()
         
