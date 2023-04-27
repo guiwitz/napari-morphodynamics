@@ -12,7 +12,7 @@ class FolderListWidget(QListWidget):
         self.viewer = viewer
         self.setAcceptDrops(True)
         self.setDragEnabled(True)
-        self.currentItemChanged.connect(self.open_file)
+        #self.currentItemChanged.connect(self.open_file)
 
         self.folder_path = None
 
@@ -57,8 +57,8 @@ class FolderListWidget(QListWidget):
         
         self.setCurrentRow(0)
 
-    def open_file(self):
+    '''def open_file(self):
         item = self.currentItem()
         image_name = item.text()
         self.viewer.layers.clear()
-        self.viewer.open(Path(self.folder_path).joinpath(image_name))
+        self.viewer.open(Path(self.folder_path).joinpath(image_name))'''
