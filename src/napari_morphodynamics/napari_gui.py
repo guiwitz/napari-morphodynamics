@@ -207,6 +207,9 @@ class MorphoWidget(QWidget):
         self._display_options_layout.addWidget(self.display_wlayers, 0, 1)
         self.intensity_plot = DataPlotter(self.viewer)
         self._display_options_layout.addWidget(self.intensity_plot, 1, 0, 1, 2)
+        self.combo_channel = QComboBox()
+        self._display_options_layout.addWidget(QLabel('Channel'), 2, 0, 1, 1)
+        self._display_options_layout.addWidget(self.combo_channel, 2, 1, 1, 1)
 
         # dask options
         dask_group = VHGroup('Dask options', 'G')
@@ -266,6 +269,7 @@ class MorphoWidget(QWidget):
         self.btn_select_segmentation.clicked.connect(self._on_click_select_segmentation)
 
         self.btn_load_analysis.clicked.connect(self._on_load_analysis)
+        self.combo_channel.currentIndexChanged.connect(self.update_plot)
 
         self.file_list.model().rowsInserted.connect(self._on_change_filelist)
         self.file_list.currentItemChanged.connect(self._on_select_file)
@@ -325,6 +329,7 @@ class MorphoWidget(QWidget):
         self.signal_channel.clear()
         self.segm_channel.addItems(files)
         self.signal_channel.addItems(files)
+        self.combo_channel.addItems(files)
         self._on_update_param()
 
     def _on_load_single_file_data(self):
@@ -334,6 +339,7 @@ class MorphoWidget(QWidget):
         self.signal_channel.clear()
         self.segm_channel.addItems(channel_list)
         self.signal_channel.addItems(channel_list)
+        self.combo_channel.addItems(channel_list)
         self._on_update_param()
 
     def _on_select_file(self):
@@ -433,10 +439,13 @@ class MorphoWidget(QWidget):
         self.cluster.close()
         self.cluster = None
 
-    def _on_click_select_analysis(self):
+    def _on_click_select_analysis(self, analysis_path=None):
         """Select folder where to save the analysis."""
 
-        self.analysis_path = Path(str(QFileDialog.getExistingDirectory(self, "Select Directory")))
+        if analysis_path is not None:
+            self.analysis_path = Path(analysis_path)
+        else:
+            self.analysis_path = Path(str(QFileDialog.getExistingDirectory(self, "Select Directory")))
         self.display_analysis_folder.setText(self.analysis_path.as_posix())
         self._on_update_param()
         if self.param.seg_folder is None:
@@ -484,16 +493,28 @@ class MorphoWidget(QWidget):
                 self.viewer.layers['windows'].color[j][-1]=val_to_set
         self.viewer.layers['windows'].color_mode = 'direct'
 
+        self.update_plot()
+
+    def update_plot(self):
+
+        on_list = [int(x.text()) for x in self.display_wlayers.selectedItems()]
+        if len(on_list) == 0:
+            return
+        
+        channel_index = self.combo_channel.currentIndex()
         self.intensity_plot.axes.clear()
         self.intensity_plot.axes.set_title('Intensity')
         self.intensity_plot.axes.set_xlabel('Time')
         self.intensity_plot.axes.set_ylabel('Window')
+
+        signal = self.res.mean[channel_index,on_list[0]]
+        percentile1 = np.percentile(signal[~np.isnan(signal)],1)
+        percentile99 = np.percentile(signal[~np.isnan(signal)],99)
         self.intensity_plot.axes.imshow(
-            self.res.mean[0,on_list[0]],
-            vmin=np.percentile(self.res.mean[0,0],1),
-            vmax=np.percentile(self.res.mean[0,0],99))
+            signal,
+            vmin=percentile1,
+            vmax=percentile99)
         self.intensity_plot.canvas.figure.canvas.draw()
-        
 
     def create_stacks(self):
         """Create and add to the viewer datasets as dask stacks.
@@ -615,13 +636,34 @@ class MorphoWidget(QWidget):
         self.param, self.res, self.data = load_alldata(
             self.analysis_path, load_results=True
         )
-        self._on_update_interface()
+        self.file_list.model().rowsInserted.disconnect(self._on_change_filelist)
+        self.segm_channel.currentItemChanged.disconnect(self._on_update_param)
+        self.signal_channel.itemSelectionChanged.disconnect(self._on_update_param)
+        
         if self.param.data_type == 'zarr':
             main_folder = self.param.data_folder.parent
         else:
             main_folder = self.param.data_folder
         
         self.file_list.update_from_path(main_folder)
+        # select an element in the file list
+        files = [self.file_list.item(i).text() for i in range(self.file_list.count())]
+        
+        self.file_list.item(files.index(self.param.data_folder.name)).setSelected(True)
+
+        self.segm_channel.addItems(self.data.channel_name)
+        self.segm_channel.item(self.data.channel_name.index(self.param.morpho_name)).setSelected(True)
+        self.signal_channel.addItems(self.data.channel_name)
+        self.combo_channel.addItems(self.data.channel_name)
+
+        for i in range(len(self.param.signal_name)):
+            self.signal_channel.item(self.data.channel_name.index(self.param.signal_name[i])).setSelected(True)
+        
+        self.file_list.model().rowsInserted.connect(self._on_change_filelist)
+        self.segm_channel.currentItemChanged.connect(self._on_update_param)
+        self.signal_channel.itemSelectionChanged.connect(self._on_update_param)
+
+        self._on_update_interface()
         self.create_stacks()
         self._on_load_windows()
         
