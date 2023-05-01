@@ -86,6 +86,12 @@ class MorphoWidget(QWidget):
         self.dask.setLayout(self._dask_layout)
         self.tabs.addTab(self.dask, 'Dask')
 
+        # plot tab
+        self.plot_tab = QWidget()
+        self._plot_layout = QVBoxLayout()
+        self.plot_tab.setLayout(self._plot_layout)
+        self.tabs.addTab(self.plot_tab, 'Plots')
+
         # add convpaint widget
         #self.deep_paint_widget = DeepPaintWidget(self.viewer, self.param)
         self.conv_paint_widget = ConvPaintWidget(self.viewer)
@@ -251,7 +257,11 @@ class MorphoWidget(QWidget):
         self._dask_layout.addStretch()
         #self._display_options_layout.addStretch()
 
+        self.displacement_plot = DataPlotter(self.viewer)
+        self._plot_layout.addWidget(self.displacement_plot)
+
         self._add_callbacks()
+
 
     def _add_callbacks(self):
 
@@ -269,7 +279,7 @@ class MorphoWidget(QWidget):
         self.btn_select_segmentation.clicked.connect(self._on_click_select_segmentation)
 
         self.btn_load_analysis.clicked.connect(self._on_load_analysis)
-        self.combo_channel.currentIndexChanged.connect(self.update_plot)
+        self.combo_channel.currentIndexChanged.connect(self.update_intensity_plot)
 
         self.file_list.model().rowsInserted.connect(self._on_change_filelist)
         self.file_list.currentItemChanged.connect(self._on_select_file)
@@ -329,7 +339,6 @@ class MorphoWidget(QWidget):
         self.signal_channel.clear()
         self.segm_channel.addItems(files)
         self.signal_channel.addItems(files)
-        self.combo_channel.addItems(files)
         self._on_update_param()
 
     def _on_load_single_file_data(self):
@@ -380,6 +389,8 @@ class MorphoWidget(QWidget):
         
         self._on_load_windows()
         export_results_parameters(self.param, self.res)
+        self.update_displacement_plot()
+
 
     def _on_run_seg_spline(self):
         
@@ -439,7 +450,7 @@ class MorphoWidget(QWidget):
         self.cluster.close()
         self.cluster = None
 
-    def _on_click_select_analysis(self, analysis_path=None):
+    def _on_click_select_analysis(self, event=None, analysis_path=None):
         """Select folder where to save the analysis."""
 
         if analysis_path is not None:
@@ -479,6 +490,7 @@ class MorphoWidget(QWidget):
         
         self.data, self.param = dataset_from_param(self.param)
         self.create_stacks()
+        self.combo_channel.addItems(self.data.channel_name)
 
     def _on_display_wlayers_selection_changed(self):
         """Hide/reveal window layers."""
@@ -493,9 +505,9 @@ class MorphoWidget(QWidget):
                 self.viewer.layers['windows'].color[j][-1]=val_to_set
         self.viewer.layers['windows'].color_mode = 'direct'
 
-        self.update_plot()
+        self.update_intensity_plot()
 
-    def update_plot(self):
+    def update_intensity_plot(self):
 
         on_list = [int(x.text()) for x in self.display_wlayers.selectedItems()]
         if len(on_list) == 0:
@@ -515,6 +527,14 @@ class MorphoWidget(QWidget):
             vmin=percentile1,
             vmax=percentile99)
         self.intensity_plot.canvas.figure.canvas.draw()
+
+    def update_displacement_plot(self):
+
+        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement
+        fig = self.displacement_plot.canvas.figure
+        ax = self.displacement_plot.axes
+        show_cumdisplacement(self.res, fig_ax=(fig, ax))
+        self.displacement_plot.canvas.figure.canvas.draw()
 
     def create_stacks(self):
         """Create and add to the viewer datasets as dask stacks.
@@ -666,6 +686,9 @@ class MorphoWidget(QWidget):
         self._on_update_interface()
         self.create_stacks()
         self._on_load_windows()
+        
+        #plots
+        self.update_displacement_plot()
         
 
     def _on_update_interface(self):
