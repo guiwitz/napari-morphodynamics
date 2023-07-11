@@ -19,7 +19,7 @@ from dask_jobqueue import SLURMCluster
 from dask.distributed import Client, LocalCluster
 
 from .folder_list_widget import FolderListWidget
-from .VHGroup import VHGroup
+from napari_guitils.gui_structures import VHGroup, TabSet
 from .base_plot import DataPlotter
 
 from morphodynamics.store.parameters import Param
@@ -27,6 +27,7 @@ from morphodynamics.utils import dataset_from_param, load_alldata, export_result
 from morphodynamics.analysis_par import analyze_morphodynamics, segment_single_frame, compute_spline_windows
 from morphodynamics.windowing import label_windows
 from napari_convpaint import ConvPaintWidget
+from napari_convpaint.conv_paint_utils import Classifier
 
 
 class MorphoWidget(QWidget):
@@ -358,7 +359,7 @@ class MorphoWidget(QWidget):
         self._on_load_single_file_data()
 
     def _on_load_model(self):
-        self.param.random_forest = self.conv_paint_widget.param.random_forest
+        self.param.random_forest = Path(self.conv_paint_widget.param.random_forest)
 
     def _on_run_analysis(self):
         """Run full morphodynamics analysis"""
@@ -367,8 +368,8 @@ class MorphoWidget(QWidget):
             self.initialize_dask()
         
         model = None
-        if self.param.seg_algo == 'conv_paint':
-            model = self.load_convpaint_model()
+        #if self.param.seg_algo == 'conv_paint':
+        #    model = self.load_convpaint_model()
 
         # run with dask if selected
         if self.check_use_dask.isChecked():
@@ -396,8 +397,7 @@ class MorphoWidget(QWidget):
         
         if self.analysis_path is None:
             self._on_click_select_analysis()
-        if self.param.seg_algo == 'conv_paint':
-            self.load_convpaint_model(return_model=False)
+        
         step = self.viewer.dims.current_step[0]
         image, c, im_windows, windows = compute_spline_windows(self.param, step)
 
@@ -473,13 +473,8 @@ class MorphoWidget(QWidget):
     def load_convpaint_model(self, return_model=True):
         """Load RF model for segmentation"""
         
-        #if self.conv_paint_widget.random_forest is not None:
-        #    self.conv_paint_widget.save_model()
-        #else:
-        if self.conv_paint_widget.random_forest is None:
-            self.conv_paint_widget.load_model()
-        self.param.random_forest = self.conv_paint_widget.param.random_forest
-        model=self.conv_paint_widget.random_forest
+        model = Classifier(self.param.random_forest)
+        
         if return_model:
             return model
         else:
