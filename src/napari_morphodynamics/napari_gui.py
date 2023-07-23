@@ -8,10 +8,12 @@ from itertools import cycle
 from pathlib import Path
 from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox,
 QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,
-QTabWidget, QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
+QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
+from qtpy.QtCore import Qt
 
 import numpy as np
 import napari
+import skimage
 
 from dask import delayed
 import dask.array as da
@@ -23,8 +25,11 @@ from napari_guitils.gui_structures import VHGroup, TabSet
 from .base_plot import DataPlotter
 
 from morphodynamics.store.parameters import Param
-from morphodynamics.utils import dataset_from_param, load_alldata, export_results_parameters
-from morphodynamics.analysis_par import analyze_morphodynamics, segment_single_frame, compute_spline_windows
+from morphodynamics.utils import (dataset_from_param, load_alldata, 
+                                  export_results_parameters)
+from morphodynamics.analysis_par import (
+    analyze_morphodynamics, segment_single_frame, 
+    compute_spline_windows, segment_and_track, spline_and_window)
 from morphodynamics.windowing import label_windows
 from napari_convpaint import ConvPaintWidget
 from napari_convpaint.conv_paint_utils import Classifier
@@ -51,58 +56,29 @@ class MorphoWidget(QWidget):
         self.analysis_path = None
         self.cluster = None
 
-        self._layout = QVBoxLayout()
-        self.setLayout(self._layout)
+        self.main_layout = QVBoxLayout()
+        self.setLayout(self.main_layout)
         self.setMinimumWidth(400)
-        self.tabs = QTabWidget()
-        self._layout.addWidget(self.tabs)
 
-        # main tab
-        self.main = QWidget()
-        self._main_layout = QVBoxLayout()
-        self.main.setLayout(self._main_layout)
-        self.tabs.addTab(self.main, 'Main')
+        self.tab_names = [
+            'Data', 'Segmentation', 'Windowing', 'Display options',
+            'Dask', 'Plots']
+        self.tabs = TabSet(
+            self.tab_names,
+            tab_layouts=[None, None, None, QGridLayout(), None, None]
+        )
 
-        # options tab
-        self.options = QWidget()
-        self._options_layout = QVBoxLayout()
-        self.options.setLayout(self._options_layout)
-        self.tabs.addTab(self.options, 'Options')
-        
-        # conv paint tab
-        self.paint = QWidget()
-        self._paint_layout = QVBoxLayout()
-        self.paint.setLayout(self._paint_layout)
-        self.tabs.addTab(self.paint, 'Conv paint')
-
-        # display tab
-        self.display_options = QWidget()
-        self._display_options_layout = QGridLayout()
-        self.display_options.setLayout(self._display_options_layout)
-        self.tabs.addTab(self.display_options, 'Display options')
-
-        # dask tab
-        self.dask = QWidget()
-        self._dask_layout = QVBoxLayout()
-        self.dask.setLayout(self._dask_layout)
-        self.tabs.addTab(self.dask, 'Dask')
-
-        # plot tab
-        self.plot_tab = QWidget()
-        self._plot_layout = QVBoxLayout()
-        self.plot_tab.setLayout(self._plot_layout)
-        self.tabs.addTab(self.plot_tab, 'Plots')
-
-        # add convpaint widget
-        #self.deep_paint_widget = DeepPaintWidget(self.viewer, self.param)
-        self.conv_paint_widget = ConvPaintWidget(self.viewer)
-        self._paint_layout.addWidget(self.conv_paint_widget)
+        self.main_layout.addWidget(self.tabs)
 
         # add widgets to main tab
         self.data_vgroup = VHGroup('1. Select location of data', orientation='G')
-        self._main_layout.addWidget(self.data_vgroup.gbox)
+        self.tabs.add_named_tab('Data', self.data_vgroup.gbox)
 
         # files
+        self.qcombobox_data_type = QComboBox()
+        self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nd2', 'h5', 'nparray'])
+        self.data_vgroup.glayout.addWidget(QLabel('Data type'), 0, 0)
+        self.data_vgroup.glayout.addWidget(self.qcombobox_data_type, 0, 1)
         self.file_list = FolderListWidget(napari_viewer)
         self.data_vgroup.glayout.addWidget(self.file_list)
         self.file_list.setMaximumHeight(100)
@@ -120,7 +96,7 @@ class MorphoWidget(QWidget):
         self.signal_channel.setSelectionMode(QAbstractItemView.ExtendedSelection)
 
         channel_group = VHGroup('2. Select channels to use', orientation='G')
-        self._main_layout.addWidget(channel_group.gbox)
+        self.tabs.add_named_tab('Data', channel_group.gbox)
 
         channel_group.glayout.addWidget(QLabel('Segmentation'),0,0)
         channel_group.glayout.addWidget(QLabel('Signal'),0,1)
@@ -129,14 +105,14 @@ class MorphoWidget(QWidget):
 
         # load data
         load_group = VHGroup('3. Load and display the dataset', orientation='G')
-        self._main_layout.addWidget(load_group.gbox)
+        self.tabs.add_named_tab('Data', load_group.gbox)
         self.btn_load_data = QPushButton("Load")
         load_group.glayout.addWidget(self.btn_load_data)
 
         # select saving place
         analysis_vgroup = VHGroup('4. Set location to save analysis', 'G')
         analysis_vgroup.gbox.setMaximumHeight(100)
-        self._main_layout.addWidget(analysis_vgroup.gbox)
+        self.tabs.add_named_tab('Data', analysis_vgroup.gbox)
 
         self.btn_select_analysis = QPushButton("Set analysis folder")
         self.display_analysis_folder = QLabel("No selection")
@@ -144,37 +120,53 @@ class MorphoWidget(QWidget):
         #, self.scroll_analysis = scroll_label('No selection.')
         analysis_vgroup.glayout.addWidget(self.display_analysis_folder, 0, 0)
         analysis_vgroup.glayout.addWidget(self.btn_select_analysis, 0, 1)
-        
-        segmentation_group = VHGroup('Alternative segmentation', 'G')
-        segmentation_group.gbox.setMaximumHeight(150)
-        
-        self._options_layout.addWidget(segmentation_group.gbox)
-        self.btn_select_segmentation = QPushButton("Set segmentation folder")
-        self.display_segmentation_folder, self.scroll_segmentation = scroll_label('No selection.')
-        segmentation_group.glayout.addWidget(self.scroll_segmentation, 0, 0)
-        segmentation_group.glayout.addWidget(self.btn_select_segmentation, 1, 0)
 
         # load analysis
         self.btn_load_analysis = QPushButton("Load analysis")
-        self._options_layout.addWidget(self.btn_load_analysis)
+        analysis_vgroup.glayout.addWidget(self.btn_load_analysis, 1, 0)
 
-        self.settings_vgroup = VHGroup('5. Set analysis settings and run', orientation='G')
-        self._main_layout.addWidget(self.settings_vgroup.gbox)
-
+        # segmentation tab
+        self.segoptions_vgroup = VHGroup('Windowing', orientation='G')
+        self.segoptions_vgroup.glayout.setAlignment(Qt.AlignTop)
+        self.tabs.add_named_tab('Segmentation', self.segoptions_vgroup.gbox)
         # algo choice
         self.seg_algo = QComboBox()
-        self.seg_algo.addItems(['cellpose', 'ilastik', 'farid', 'conv_paint'])
+        self.seg_algo.addItems(['cellpose', 'ilastik', 'farid', 'conv_paint', 'precomputed'])
         self.seg_algo.setCurrentIndex(0)
-        self.settings_vgroup.glayout.addWidget(QLabel('Algorithm'), 0, 0)
-        self.settings_vgroup.glayout.addWidget(self.seg_algo, 0, 1)
+        self.segoptions_vgroup.glayout.addWidget(QLabel('Algorithm'), 0, 0)
+        self.segoptions_vgroup.glayout.addWidget(self.seg_algo, 0, 1)
 
-        # algo options
+        # cellpose algo options
         self.cell_diameter = QSpinBox()
         self.cell_diameter.setValue(20)
         self.cell_diameter.setMaximum(10000)
         self.cell_diameter_label = QLabel('Cell diameter')
-        self.settings_vgroup.glayout.addWidget(self.cell_diameter_label, 1, 0)
-        self.settings_vgroup.glayout.addWidget(self.cell_diameter, 1, 1)
+        self.segoptions_vgroup.glayout.addWidget(self.cell_diameter_label, 1, 0, 1, 1)
+        self.segoptions_vgroup.glayout.addWidget(self.cell_diameter, 1, 1, 1, 1)
+
+        # convpaint options
+        self.conv_paint_widget = ConvPaintWidget(self.viewer)
+        self.segoptions_vgroup.glayout.addWidget(self.conv_paint_widget, 2, 0, 1, 2)
+        self.conv_paint_widget.setVisible(False)
+
+        self.segmentation_group = VHGroup('Existing segmentation', 'G')
+        #segmentation_group.glayout.setAlignment(Qt.AlignTop)
+        self.segmentation_group.gbox.setVisible(False)
+        self.segmentation_group.gbox.setMaximumHeight(150)
+        
+        self.segoptions_vgroup.glayout.addWidget(self.segmentation_group.gbox, 3, 0, 1, 2)
+        self.btn_select_segmentation = QPushButton("Set segmentation folder")
+        self.display_segmentation_folder, self.scroll_segmentation = scroll_label('No selection.')
+        self.segmentation_group.glayout.addWidget(self.scroll_segmentation, 0, 0)
+        self.segmentation_group.glayout.addWidget(self.btn_select_segmentation, 1, 0)
+
+        self.btn_run_segmentation = QPushButton("Run segmentation")
+        self.tabs.add_named_tab('Segmentation', self.btn_run_segmentation)
+
+        # run analysis
+        self.settings_vgroup = VHGroup('Set analysis settings and run', orientation='G')
+        self.settings_vgroup.glayout.setAlignment(Qt.AlignTop)
+        self.tabs.add_named_tab('Windowing', self.settings_vgroup.gbox)
 
         # smoothing
         self.smoothing = QSpinBox()
@@ -195,13 +187,10 @@ class MorphoWidget(QWidget):
         self.settings_vgroup.glayout.addWidget(QLabel('Window width'), 4, 0)
         self.settings_vgroup.glayout.addWidget(self.width, 4, 1)
 
-        # run analysis
-        btn_run = QPushButton("Run analysis")
-        btn_run.clicked.connect(self._on_run_analysis)
-        self.settings_vgroup.glayout.addWidget(btn_run, 5, 0)
-        btn_run_single_segmentation = QPushButton("Run single")
-        btn_run_single_segmentation.clicked.connect(self._on_run_seg_spline)
-        self.settings_vgroup.glayout.addWidget(btn_run_single_segmentation, 5, 1)
+        self.btn_run_spline_and_window = QPushButton("Run windowing")
+        self.settings_vgroup.glayout.addWidget(self.btn_run_spline_and_window, 5, 0)
+        self.btn_run_single_segmentation = QPushButton("Run single frame")
+        self.settings_vgroup.glayout.addWidget(self.btn_run_single_segmentation, 5, 1)
         self.check_use_dask = QCheckBox('Use dask')
         self.check_use_dask.setChecked(False)
         self.settings_vgroup.glayout.addWidget(self.check_use_dask, 5, 2)
@@ -210,18 +199,18 @@ class MorphoWidget(QWidget):
         self.display_wlayers = QListWidget()
         self.display_wlayers.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.display_wlayers.itemSelectionChanged.connect(self._on_display_wlayers_selection_changed)
-        self._display_options_layout.addWidget(QLabel('Window layers'), 0, 0)
-        self._display_options_layout.addWidget(self.display_wlayers, 0, 1)
+        self.tabs.add_named_tab('Display options', QLabel('Window layers'), (0, 0, 1, 1))
+        self.tabs.add_named_tab('Display options', self.display_wlayers, (0, 1, 1, 1))
         self.intensity_plot = DataPlotter(self.viewer)
-        self._display_options_layout.addWidget(self.intensity_plot, 1, 0, 1, 2)
+        self.tabs.add_named_tab('Display options', self.intensity_plot, (1, 0, 1, 2))
         self.combo_channel = QComboBox()
-        self._display_options_layout.addWidget(QLabel('Channel'), 2, 0, 1, 1)
-        self._display_options_layout.addWidget(self.combo_channel, 2, 1, 1, 1)
+        self.tabs.add_named_tab('Display options', QLabel('Channel'), (2, 0, 1, 1))
+        self.tabs.add_named_tab('Display options', self.combo_channel, (2, 1, 1, 1))
 
         # dask options
         dask_group = VHGroup('Dask options', 'G')
         dask_group.gbox.setMaximumHeight(150)
-        self._dask_layout.addWidget(dask_group.gbox)
+        self.tabs.add_named_tab('Dask', dask_group.gbox)
         self.dask_num_workers = QSpinBox()
         self.dask_num_workers.setValue(1)
         self.dask_num_workers.setMaximum(64)
@@ -247,19 +236,18 @@ class MorphoWidget(QWidget):
         dask_group.glayout.addWidget(self.dask_cluster_type, 3, 1)
 
         self.dask_initialize_button = QPushButton("Initialize dask")
-        self._dask_layout.addWidget(self.dask_initialize_button)
+        self.tabs.add_named_tab('Dask', self.dask_initialize_button)
         
         self.dask_stop_cluster_button = QPushButton("Stop dask cluster")
-        self._dask_layout.addWidget(self.dask_stop_cluster_button)
+        self.tabs.add_named_tab('Dask', self.dask_stop_cluster_button)
 
         # make sure widgets don't occupy more space than they need
-        self._options_layout.addStretch()
-        self._paint_layout.addStretch()
-        self._dask_layout.addStretch()
-        #self._display_options_layout.addStretch()
+        #self._options_layout.addStretch()
+        #self._paint_layout.addStretch()
+        #self._dask_layout.addStretch()
 
         self.displacement_plot = DataPlotter(self.viewer)
-        self._plot_layout.addWidget(self.displacement_plot)
+        self.tabs.add_named_tab('Plots', self.displacement_plot)
 
         self._add_callbacks()
 
@@ -283,7 +271,6 @@ class MorphoWidget(QWidget):
         self.combo_channel.currentIndexChanged.connect(self.update_intensity_plot)
 
         self.file_list.model().rowsInserted.connect(self._on_change_filelist)
-        self.file_list.currentItemChanged.connect(self._on_select_file)
         self.cell_diameter.valueChanged.connect(self._on_update_param)
 
         self.dask_num_workers.valueChanged.connect(self._on_update_dask_wokers)
@@ -291,6 +278,11 @@ class MorphoWidget(QWidget):
         self.dask_stop_cluster_button.clicked.connect(self._on_dask_shutdown)
 
         self.conv_paint_widget.load_model_btn.clicked.connect(self._on_load_model)
+        self.conv_paint_widget.save_model_btn.clicked.connect(self._on_load_model)
+        self.btn_run_segmentation.clicked.connect(self._on_run_segmentation)
+        self.btn_run_single_segmentation.clicked.connect(self._on_run_seg_spline)
+        self.btn_run_spline_and_window.clicked.connect(self._on_run_spline_and_window)
+
 
     def _on_update_param(self):
         """Update multiple entries of the param object."""
@@ -302,6 +294,15 @@ class MorphoWidget(QWidget):
         else:
             self.cell_diameter.setVisible(True)
             self.cell_diameter_label.setVisible(True)
+        if self.param.seg_algo != 'conv_paint':
+            self.conv_paint_widget.setVisible(False)
+        else:
+            self.conv_paint_widget.setVisible(True)
+        if self.param.seg_algo != 'precomputed':
+            self.segmentation_group.gbox.setVisible(False)
+        else:
+            self.segmentation_group.gbox.setVisible(True)
+
         self.param.lambda_ = self.smoothing.value()
         self.param.width = self.width.value()
         if self.segm_channel.currentItem() is not None:
@@ -328,8 +329,43 @@ class MorphoWidget(QWidget):
     def _on_click_select_file_folder(self):
         """Interactively select folder to analyze"""
 
-        file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-        self.file_list.update_from_path(Path(file_folder))
+        if self.qcombobox_data_type.currentText() == 'zarr':
+            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+            parent_folder = Path(file_folder).parent
+            self.file_list.update_from_path(parent_folder)
+            items = [self.file_list.item(x).text() for x in range(self.file_list.count())]
+            file_index = items.index(Path(file_folder).name)
+            self.file_list.setCurrentRow(file_index)
+            self.param.data_type = "zarr"
+            self.param.data_folder = Path(file_folder)
+            self.data, self.param = dataset_from_param(self.param)
+        
+        elif self.qcombobox_data_type.currentText() == 'multipage_tiff':
+            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+            self.param.data_folder = parent_folder
+            self.file_list.update_from_path(parent_folder)
+            self.param.data_type = "multi"
+            self.data, self.param = dataset_from_param(self.param)
+        
+        elif self.qcombobox_data_type.currentText() == 'tiff_series':
+            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+            self.param.data_folder = file_folder
+            self.file_list.update_from_path(file_folder)
+            self.param.data_type = "series"
+            self.data, self.param = dataset_from_param(self.param)
+        
+        elif self.qcombobox_data_type.currentText() == 'nparray':
+            selected_file, ok = QFileDialog.getOpenFileName(self, "Select File")
+            parent_folder = Path(selected_file).parent
+            self.param.data_folder = parent_folder
+            self.file_list.update_from_path(parent_folder)
+            items = [self.file_list.item(x).text() for x in range(self.file_list.count())]
+            file_index = items.index(Path(selected_file).name)
+            self.file_list.setCurrentRow(file_index)
+            self.param.data_type = "np"
+            self.data, self.param = dataset_from_param(self.param)
+        self._on_load_single_file_data()
+
 
     def _on_change_filelist(self):
         """Update the channel list when main file list changes."""
@@ -352,24 +388,35 @@ class MorphoWidget(QWidget):
         self.combo_channel.addItems(channel_list)
         self._on_update_param()
 
-    def _on_select_file(self):
-        
-        self.param.data_folder = Path(self.file_list.folder_path).joinpath(self.file_list.currentItem().text())
-        self.data, self.param = dataset_from_param(self.param)
-        self._on_load_single_file_data()
-
     def _on_load_model(self):
         self.param.random_forest = Path(self.conv_paint_widget.param.random_forest)
 
-    def _on_run_analysis(self):
+    def _on_run_spline_and_window(self):
+        """Run full morphodynamics analysis"""
+
+        if self.cluster is None and self.check_use_dask.isChecked():
+            self.initialize_dask()
+        
+        # run with dask if selected
+        if self.check_use_dask.isChecked():
+            with Client(self.cluster) as client:
+                spline_and_window(data=self.data,
+                    param=self.param, res=self.res, client=client)
+        else:
+            spline_and_window(data=self.data,
+                    param=self.param, res=self.res)
+        
+        self._on_load_windows()
+        export_results_parameters(self.param, self.res)
+        self.update_displacement_plot()
+
+    def _on_run_full_analysis(self):
         """Run full morphodynamics analysis"""
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
         
         model = None
-        #if self.param.seg_algo == 'conv_paint':
-        #    model = self.load_convpaint_model()
 
         # run with dask if selected
         if self.check_use_dask.isChecked():
@@ -391,6 +438,42 @@ class MorphoWidget(QWidget):
         self._on_load_windows()
         export_results_parameters(self.param, self.res)
         self.update_displacement_plot()
+
+
+    def _on_run_segmentation(self):
+        """Run segmentation."""
+
+        if self.cluster is None and self.check_use_dask.isChecked():
+            self.initialize_dask()
+        
+        model = None
+
+        if self.check_use_dask.isChecked():
+            with Client(self.cluster) as client:
+                self.res, _ = segment_and_track(
+                    data=self.data,
+                    param=self.param,
+                    client=client,
+                )
+        else:
+            self.res, _ = segment_and_track(
+                    data=self.data,
+                    param=self.param,
+                    client=None,
+                )
+        
+        self.display_mask()
+        export_results_parameters(self.param, self.res)
+                            
+    def display_mask(self):
+
+        save_path = self.param.analysis_folder.joinpath("segmented")
+        mask_list = []
+        for k in range(self.data.num_timepoints):
+            image_path = save_path.joinpath(f"tracked_k_{k}.tif")  
+            mask_list.append(skimage.io.imread(image_path))
+        mask_list = np.stack(mask_list, axis=0)
+        self.viewer.add_labels(mask_list, name='segmentation')
 
 
     def _on_run_seg_spline(self):
@@ -680,7 +763,12 @@ class MorphoWidget(QWidget):
 
         self._on_update_interface()
         self.create_stacks()
-        self._on_load_windows()
+
+        if len(list(Path(self.param.analysis_folder).joinpath('segmented').glob('*.pkl'))) > 0:
+            self._on_load_windows()
+        else:
+            self.display_mask()
+
         
         #plots
         self.update_displacement_plot()
