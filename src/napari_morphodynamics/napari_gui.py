@@ -31,7 +31,7 @@ from morphodynamics.analysis_par import (
     analyze_morphodynamics, segment_single_frame, 
     compute_spline_windows, segment_and_track, spline_and_window)
 from morphodynamics.windowing import label_windows
-from napari_convpaint import ConvPaintWidget
+from napari_convpaint.conv_paint import ConvPaintWidget
 from napari_convpaint.conv_paint_utils import Classifier
 
 
