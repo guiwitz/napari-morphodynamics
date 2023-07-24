@@ -77,16 +77,13 @@ class MorphoWidget(QWidget):
         # files
         self.qcombobox_data_type = QComboBox()
         self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nd2', 'h5', 'nparray'])
-        self.data_vgroup.glayout.addWidget(QLabel('Data type'), 0, 0)
-        self.data_vgroup.glayout.addWidget(self.qcombobox_data_type, 0, 1)
+        self.data_vgroup.glayout.addWidget(self.qcombobox_data_type, 0, 0, 1, 1)
+        self.btn_select_file_folder = QPushButton("Select data folder")
+        self.data_vgroup.glayout.addWidget(self.btn_select_file_folder)
         self.file_list = FolderListWidget(napari_viewer)
         self.data_vgroup.glayout.addWidget(self.file_list)
         self.file_list.setMaximumHeight(100)
-
-        # Pick folder to analyse interactively
-        btn_select_file_folder = QPushButton("Select data folder")
-        btn_select_file_folder.clicked.connect(self._on_click_select_file_folder)
-        self.data_vgroup.glayout.addWidget(btn_select_file_folder)
+        
 
         # channel selection
         self.segm_channel = QListWidget()
@@ -262,6 +259,7 @@ class MorphoWidget(QWidget):
         self.segm_channel.currentItemChanged.connect(self._on_update_param)
         self.signal_channel.itemSelectionChanged.connect(self._on_update_param)
 
+        self.btn_select_file_folder.clicked.connect(self._on_click_select_file_folder)
         self.btn_load_data.clicked.connect(self._on_load_dataset)
 
         self.btn_select_analysis.clicked.connect(self._on_click_select_analysis)
@@ -326,11 +324,16 @@ class MorphoWidget(QWidget):
             self.param.seg_folder = Path(self.display_segmentation_folder.text())
         self.param.diameter = self.cell_diameter.value()
 
-    def _on_click_select_file_folder(self):
+    def _on_click_select_file_folder(self, event=None, file_folder=None):
         """Interactively select folder to analyze"""
-
+        
+        if file_folder is None:
+            if self.qcombobox_data_type.currentText() in ['zarr', 'multipage_tiff', 'tiff_series']:
+                file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
+            elif self.qcombobox_data_type.currentText() == 'nparray':
+                file_folder, ok = QFileDialog.getOpenFileName(self, "Select File")
+                
         if self.qcombobox_data_type.currentText() == 'zarr':
-            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
             parent_folder = Path(file_folder).parent
             self.file_list.update_from_path(parent_folder)
             items = [self.file_list.item(x).text() for x in range(self.file_list.count())]
@@ -341,26 +344,23 @@ class MorphoWidget(QWidget):
             self.data, self.param = dataset_from_param(self.param)
         
         elif self.qcombobox_data_type.currentText() == 'multipage_tiff':
-            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
-            self.param.data_folder = parent_folder
-            self.file_list.update_from_path(parent_folder)
+            self.param.data_folder = file_folder
+            self.file_list.update_from_path(file_folder)
             self.param.data_type = "multi"
             self.data, self.param = dataset_from_param(self.param)
         
         elif self.qcombobox_data_type.currentText() == 'tiff_series':
-            file_folder = str(QFileDialog.getExistingDirectory(self, "Select Directory"))
             self.param.data_folder = file_folder
             self.file_list.update_from_path(file_folder)
             self.param.data_type = "series"
             self.data, self.param = dataset_from_param(self.param)
         
         elif self.qcombobox_data_type.currentText() == 'nparray':
-            selected_file, ok = QFileDialog.getOpenFileName(self, "Select File")
-            parent_folder = Path(selected_file).parent
+            parent_folder = Path(file_folder).parent
             self.param.data_folder = parent_folder
             self.file_list.update_from_path(parent_folder)
             items = [self.file_list.item(x).text() for x in range(self.file_list.count())]
-            file_index = items.index(Path(selected_file).name)
+            file_index = items.index(Path(file_folder).name)
             self.file_list.setCurrentRow(file_index)
             self.param.data_type = "np"
             self.data, self.param = dataset_from_param(self.param)
