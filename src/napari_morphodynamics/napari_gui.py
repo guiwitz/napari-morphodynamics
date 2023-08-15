@@ -243,8 +243,15 @@ class MorphoWidget(QWidget):
         #self._paint_layout.addStretch()
         #self._dask_layout.addStretch()
 
+        #Plot options
+        self.drop_choose_plot = QComboBox()
+        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement'])
+        self.drop_choose_plot.setCurrentIndex(0)
+        self.tabs.add_named_tab('Plots', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
         self.tabs.add_named_tab('Plots', self.displacement_plot)
+    
+        
 
         self._add_callbacks()
 
@@ -280,6 +287,8 @@ class MorphoWidget(QWidget):
         self.btn_run_segmentation.clicked.connect(self._on_run_segmentation)
         self.btn_run_single_segmentation.clicked.connect(self._on_run_seg_spline)
         self.btn_run_spline_and_window.clicked.connect(self._on_run_spline_and_window)
+
+        self.drop_choose_plot.currentIndexChanged.connect(self.update_displacement_plot)
 
 
     def _on_update_param(self):
@@ -609,10 +618,17 @@ class MorphoWidget(QWidget):
     def update_displacement_plot(self):
 
         from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement
+        
+        self.displacement_plot.canvas.figure.clear()
+            
         fig = self.displacement_plot.canvas.figure
-        ax = self.displacement_plot.axes
-        show_cumdisplacement(self.res, fig_ax=(fig, ax))
+        ax = self.displacement_plot.canvas.figure.subplots()
+        if self.drop_choose_plot.currentText() == 'displacement':
+            show_displacement(self.res, fig_ax=(fig, ax))
+        else:
+            show_cumdisplacement(self.res, fig_ax=(fig, ax))
         self.displacement_plot.canvas.figure.canvas.draw()
+        
 
     def create_stacks(self):
         """Create and add to the viewer datasets as dask stacks.
