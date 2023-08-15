@@ -646,8 +646,12 @@ class MorphoWidget(QWidget):
             seg_lazy_arrays = [delayed(return_image)(i) for i in range(self.data.max_time)]
             dask_seg_arrays = [da.from_delayed(x, shape=sample.shape, dtype=sample.dtype) for x in seg_lazy_arrays]
             seg_stack = da.stack(dask_seg_arrays, axis=0)
-        self.viewer.add_image(seg_stack, name=self.param.morpho_name)
+        self.viewer.add_image(data=seg_stack,
+                              name=self.param.morpho_name,
+                              colormap='gray',
+                              blending='additive')
 
+        colorlist = ['magenta', 'yellow', 'cyan', 'green', 'red', 'blue']
         for ind, c in enumerate(self.param.signal_name):
             if self.data.data_type == 'h5':
                 h5file = self.data.channel_imobj[self.data.channel_name.index(c)]
@@ -660,7 +664,11 @@ class MorphoWidget(QWidget):
                 sig_lazy_arrays = [delayed(return_image)(ind, i) for i in range(self.data.max_time)]
                 dask_sig_arrays = [da.from_delayed(x, shape=sample.shape, dtype=sample.dtype) for x in sig_lazy_arrays]
                 sig_stack = da.stack(dask_sig_arrays, axis=0)
-            self.viewer.add_image(sig_stack, name=f'signal {c}')
+            self.viewer.add_image(
+                data=sig_stack, 
+                name=f'signal {c}',
+                colormap=colorlist[ind],
+                blending='additive')
     
     def create_stacks_classical(self):
         """Create stacks from the data and add them to viewer."""
