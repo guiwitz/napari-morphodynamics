@@ -34,6 +34,14 @@ from morphodynamics.windowing import label_windows
 from napari_convpaint.conv_paint import ConvPaintWidget
 from napari_convpaint.conv_paint_utils import Classifier
 
+import matplotlib as mpl
+
+mpl.rcParams['text.color'] = 'white'
+mpl.rcParams['axes.labelcolor'] = 'white'
+mpl.rcParams['xtick.color'] = 'white'
+mpl.rcParams['ytick.color'] = 'white'
+mpl.rcParams['font.size'] = 15
+
 
 class MorphoWidget(QWidget):
     """
