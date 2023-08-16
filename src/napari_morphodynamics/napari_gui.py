@@ -245,7 +245,7 @@ class MorphoWidget(QWidget):
 
         #Plot options
         self.drop_choose_plot = QComboBox()
-        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement'])
+        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature'])
         self.drop_choose_plot.setCurrentIndex(0)
         self.tabs.add_named_tab('Plots', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
@@ -402,6 +402,8 @@ class MorphoWidget(QWidget):
 
     def _on_run_spline_and_window(self):
         """Run full morphodynamics analysis"""
+
+        self.display_wlayers.clear()
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -617,7 +619,7 @@ class MorphoWidget(QWidget):
 
     def update_displacement_plot(self):
 
-        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement
+        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature
         
         self.displacement_plot.canvas.figure.clear()
             
@@ -625,6 +627,8 @@ class MorphoWidget(QWidget):
         ax = self.displacement_plot.canvas.figure.subplots()
         if self.drop_choose_plot.currentText() == 'displacement':
             show_displacement(self.res, fig_ax=(fig, ax))
+        elif self.drop_choose_plot.currentText() == 'curvature':
+            show_curvature(self.data, self.res, fig_ax=(fig, ax),show_colorbar=False)
         else:
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
         self.displacement_plot.canvas.figure.canvas.draw()
