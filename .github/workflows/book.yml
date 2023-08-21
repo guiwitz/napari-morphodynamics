@@ -15,6 +15,9 @@ permissions:
 # This job installs dependencies, build the book, and pushes it to Pages
 jobs:
   deploy-book:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url}}
     runs-on: ubuntu-latest
     steps:
       
