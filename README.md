@@ -57,7 +57,6 @@ If you encounter any problems, please [file an issue] along with a detailed desc
 
 [file an issue]: https://github.com/guiwitz/napari-morphodynamics/issues
 
-[napari]: https://github.com/napari/napari
 [tox]: https://tox.readthedocs.io/en/latest/
 [pip]: https://pypi.org/project/pip/
 [PyPI]: https://pypi.org/
