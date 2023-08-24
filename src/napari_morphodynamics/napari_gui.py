@@ -253,7 +253,7 @@ class MorphoWidget(QWidget):
 
         #Plot options
         self.drop_choose_plot = QComboBox()
-        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature'])
+        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature', 'edge overview'])
         self.drop_choose_plot.setCurrentIndex(0)
         self.tabs.add_named_tab('Plots', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
@@ -627,7 +627,7 @@ class MorphoWidget(QWidget):
 
     def update_displacement_plot(self):
 
-        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature
+        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature, show_edge_overview
         
         self.displacement_plot.canvas.figure.clear()
             
@@ -637,6 +637,8 @@ class MorphoWidget(QWidget):
             show_displacement(self.res, fig_ax=(fig, ax))
         elif self.drop_choose_plot.currentText() == 'curvature':
             show_curvature(self.data, self.res, fig_ax=(fig, ax),show_colorbar=False)
+        elif self.drop_choose_plot.currentText() == 'edge overview':
+            show_edge_overview(param=self.param, data=self.data, res=self.res, fig_ax=(fig, ax), lw=0.8)
         else:
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
         self.displacement_plot.canvas.figure.canvas.draw()
