@@ -412,6 +412,7 @@ class MorphoWidget(QWidget):
         """Run full morphodynamics analysis"""
 
         self.display_wlayers.clear()
+        self.combo_channel.clear()
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -765,6 +766,8 @@ class MorphoWidget(QWidget):
 
     def _on_load_analysis(self):
         """Load existing output of analysis"""
+        self.display_wlayers.clear()
+        self.combo_channel.clear()
         
         if self.analysis_path is None:
             self._on_click_select_analysis()
