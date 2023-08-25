@@ -1,0 +1,6 @@
+format: jb-book
+root: README
+chapters:
+  - file: book/Description
+  - file: book/installation
+  - file: book/step-by-step

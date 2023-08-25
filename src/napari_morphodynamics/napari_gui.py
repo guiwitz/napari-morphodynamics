@@ -34,6 +34,14 @@ from morphodynamics.windowing import label_windows
 from napari_convpaint.conv_paint import ConvPaintWidget
 from napari_convpaint.conv_paint_utils import Classifier
 
+import matplotlib as mpl
+
+mpl.rcParams['text.color'] = 'white'
+mpl.rcParams['axes.labelcolor'] = 'white'
+mpl.rcParams['xtick.color'] = 'white'
+mpl.rcParams['ytick.color'] = 'white'
+mpl.rcParams['font.size'] = 15
+
 
 class MorphoWidget(QWidget):
     """
@@ -245,7 +253,7 @@ class MorphoWidget(QWidget):
 
         #Plot options
         self.drop_choose_plot = QComboBox()
-        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement'])
+        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature', 'edge overview'])
         self.drop_choose_plot.setCurrentIndex(0)
         self.tabs.add_named_tab('Plots', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
@@ -402,6 +410,9 @@ class MorphoWidget(QWidget):
 
     def _on_run_spline_and_window(self):
         """Run full morphodynamics analysis"""
+
+        self.display_wlayers.clear()
+        self.combo_channel.clear()
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -617,7 +628,7 @@ class MorphoWidget(QWidget):
 
     def update_displacement_plot(self):
 
-        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement
+        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature, show_edge_overview
         
         self.displacement_plot.canvas.figure.clear()
             
@@ -625,6 +636,10 @@ class MorphoWidget(QWidget):
         ax = self.displacement_plot.canvas.figure.subplots()
         if self.drop_choose_plot.currentText() == 'displacement':
             show_displacement(self.res, fig_ax=(fig, ax))
+        elif self.drop_choose_plot.currentText() == 'curvature':
+            show_curvature(self.data, self.res, fig_ax=(fig, ax),show_colorbar=False)
+        elif self.drop_choose_plot.currentText() == 'edge overview':
+            show_edge_overview(param=self.param, data=self.data, res=self.res, fig_ax=(fig, ax), lw=0.8)
         else:
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
         self.displacement_plot.canvas.figure.canvas.draw()
@@ -751,6 +766,8 @@ class MorphoWidget(QWidget):
 
     def _on_load_analysis(self):
         """Load existing output of analysis"""
+        self.display_wlayers.clear()
+        self.combo_channel.clear()
         
         if self.analysis_path is None:
             self._on_click_select_analysis()
