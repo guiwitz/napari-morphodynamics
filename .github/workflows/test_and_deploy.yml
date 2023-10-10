@@ -52,9 +52,9 @@ jobs:
           pip install setuptools tox tox-gh-actions
       # this runs the platform-specific tests declared in tox.ini
       - name: Test with tox
-        uses: GabrielBB/xvfb-action@v1
+        uses: aganders3/headless-gui@v1
         with:
-          run: tox
+          run: python -m tox
         env:
           PLATFORM: ${{ matrix.platform }}
 
