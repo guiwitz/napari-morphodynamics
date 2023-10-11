@@ -131,7 +131,7 @@ class MorphoWidget(QWidget):
         analysis_vgroup.glayout.addWidget(self.btn_load_analysis, 1, 0)
 
         # segmentation tab
-        self.segoptions_vgroup = VHGroup('Windowing', orientation='G')
+        self.segoptions_vgroup = VHGroup('Set segmentation parameters', orientation='G')
         self.segoptions_vgroup.glayout.setAlignment(Qt.AlignTop)
         self.tabs.add_named_tab('Segmentation', self.segoptions_vgroup.gbox)
         # algo choice

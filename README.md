@@ -15,14 +15,13 @@ This plugin offers an interface for the [Morphodynamics](https://github.com/guiw
 You can install the plugin via pip with:
 
 ```
-pip install pip install git+https://github.com/guiwitz/napari-morphodynamics.git
+pip install git+https://github.com/guiwitz/napari-morphodynamics.git
 ```
 
 **Not yet on pypi**
 You can install `napari-morphodynamics` via [pip]:
 
     pip install napari-morphodynamics
-
 
 
 To install latest development version :
