@@ -6,8 +6,8 @@ by capturing views.
 import pickle
 from itertools import cycle
 from pathlib import Path
-from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox,
-QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,
+from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
+QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,QGroupBox,
 QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
 from qtpy.QtCore import Qt
 
@@ -136,18 +136,42 @@ class MorphoWidget(QWidget):
         self.tabs.add_named_tab('Segmentation', self.segoptions_vgroup.gbox)
         # algo choice
         self.seg_algo = QComboBox()
-        self.seg_algo.addItems(['cellpose', 'ilastik', 'farid', 'conv_paint', 'precomputed'])
+        self.seg_algo.addItems(['cellpose', 'farid', 'conv_paint', 'precomputed'])
         self.seg_algo.setCurrentIndex(0)
         self.segoptions_vgroup.glayout.addWidget(QLabel('Algorithm'), 0, 0)
         self.segoptions_vgroup.glayout.addWidget(self.seg_algo, 0, 1)
 
         # cellpose algo options
+        self.cellpose_widget = QGroupBox()
+        self.cellpose_layout = QGridLayout()
+        self.cellpose_widget.setLayout(self.cellpose_layout)
+        self.segoptions_vgroup.glayout.addWidget(self.cellpose_widget, 1, 0, 1, 2)
         self.cell_diameter = QSpinBox()
         self.cell_diameter.setValue(20)
         self.cell_diameter.setMaximum(10000)
         self.cell_diameter_label = QLabel('Cell diameter')
-        self.segoptions_vgroup.glayout.addWidget(self.cell_diameter_label, 1, 0, 1, 1)
-        self.segoptions_vgroup.glayout.addWidget(self.cell_diameter, 1, 1, 1, 1)
+        self.cellpose_layout.addWidget(self.cell_diameter_label, 0, 0, 1, 1)
+        self.cellpose_layout.addWidget(self.cell_diameter, 0, 1, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(self.cell_diameter_label, 1, 0, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(self.cell_diameter, 1, 1, 1, 1)
+        self.cellpose_flow_threshold = QDoubleSpinBox()
+        self.cellpose_flow_threshold.setValue(0.4)
+        self.cellpose_flow_threshold.setMaximum(3)
+        self.cellpose_flow_threshold.setMinimum(0)
+        self.cellpose_flow_threshold.setSingleStep(0.1)
+        self.cellpose_layout.addWidget(QLabel('Flow threshold'), 1, 0, 1, 1)
+        self.cellpose_layout.addWidget(self.cellpose_flow_threshold, 1, 1, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(QLabel('Flow threshold'), 2, 0, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(self.cellpose_flow_threshold, 2, 1, 1, 1)
+        self.cellpose_cellprob_threshold = QDoubleSpinBox()
+        self.cellpose_cellprob_threshold.setValue(0.0)
+        self.cellpose_cellprob_threshold.setMaximum(6)
+        self.cellpose_cellprob_threshold.setMinimum(-6)
+        self.cellpose_cellprob_threshold.setSingleStep(0.1)
+        self.cellpose_layout.addWidget(QLabel('Cell probability threshold'), 2, 0, 1, 1)
+        self.cellpose_layout.addWidget(self.cellpose_cellprob_threshold, 2, 1, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(QLabel('Cell probability threshold'), 3, 0, 1, 1)
+        #self.segoptions_vgroup.glayout.addWidget(self.cellpose_cellprob_threshold, 3, 1, 1, 1)
 
         # convpaint options
         self.conv_paint_widget = ConvPaintWidget(self.viewer)
@@ -304,11 +328,13 @@ class MorphoWidget(QWidget):
         
         self.param.seg_algo = self.seg_algo.currentText()
         if self.param.seg_algo != 'cellpose':
-            self.cell_diameter.setVisible(False)
-            self.cell_diameter_label.setVisible(False)
+            #self.cell_diameter.setVisible(False)
+            #self.cell_diameter_label.setVisible(False)
+            self.cellpose_widget.setVisible(False)
         else:
-            self.cell_diameter.setVisible(True)
-            self.cell_diameter_label.setVisible(True)
+            #self.cell_diameter.setVisible(True)
+            #self.cell_diameter_label.setVisible(True)
+            self.cellpose_widget.setVisible(True)
         if self.param.seg_algo != 'conv_paint':
             self.conv_paint_widget.setVisible(False)
         else:
@@ -431,7 +457,7 @@ class MorphoWidget(QWidget):
         self.update_displacement_plot()
 
     def _on_run_full_analysis(self):
-        """Run full morphodynamics analysis"""
+        """Run full morphodynamics analysis. Currently unused."""
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -474,12 +500,20 @@ class MorphoWidget(QWidget):
                     data=self.data,
                     param=self.param,
                     client=client,
+                    cellpose_kwargs={
+                        'flow_threshold': self.cellpose_flow_threshold.value(),
+                        'cellprob_threshold': self.cellpose_cellprob_threshold.value()
+                        }
                 )
         else:
             self.res, _ = segment_and_track(
                     data=self.data,
                     param=self.param,
                     client=None,
+                    cellpose_kwargs={
+                        'flow_threshold': self.cellpose_flow_threshold.value(),
+                        'cellprob_threshold': self.cellpose_cellprob_threshold.value()
+                        }
                 )
         
         self.display_mask()
@@ -522,7 +556,12 @@ class MorphoWidget(QWidget):
         
         step = self.viewer.dims.current_step[0]
         temp_image = segment_single_frame(
-            self.param, step, self.param.analysis_folder, return_image=True)
+            self.param, step, self.param.analysis_folder, return_image=True,
+            cellpose_kwargs={
+                        'flow_threshold': self.cellpose_flow_threshold.value(),
+                        'cellprob_threshold': self.cellpose_cellprob_threshold.value()
+                        }
+                    )
         
         self.viewer.add_labels(temp_image)
         #self.viewer.open(self.param.analysis_folder.joinpath("segmented_k_" + str(step) + ".tif"))
