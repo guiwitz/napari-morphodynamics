@@ -178,7 +178,7 @@ class MorphoWidget(QWidget):
         self.segoptions_vgroup.glayout.addWidget(self.conv_paint_widget, 2, 0, 1, 2)
         self.conv_paint_widget.setVisible(False)
 
-        self.segmentation_group = VHGroup('Existing segmentation', 'G')
+        self.segmentation_group = VHGroup('Use saved segmentation', 'G')
         #segmentation_group.glayout.setAlignment(Qt.AlignTop)
         self.segmentation_group.gbox.setVisible(False)
         self.segmentation_group.gbox.setMaximumHeight(150)
@@ -188,6 +188,22 @@ class MorphoWidget(QWidget):
         self.display_segmentation_folder, self.scroll_segmentation = scroll_label('No selection.')
         self.segmentation_group.glayout.addWidget(self.scroll_segmentation, 0, 0)
         self.segmentation_group.glayout.addWidget(self.btn_select_segmentation, 1, 0)
+
+        self.segmentationlayer_group = VHGroup('Use layer', 'G')
+        #segmentation_group.glayout.setAlignment(Qt.AlignTop)
+        self.segmentationlayer_group.gbox.setVisible(False)
+        self.segmentationlayer_group.gbox.setMaximumHeight(150)
+        self.segoptions_vgroup.glayout.addWidget(self.segmentationlayer_group.gbox, 4, 0, 1, 2)
+
+        from magicgui.widgets import create_widget
+        self.pick_layer = create_widget(annotation=napari.layers.Labels, label='Pick segmentation layer')
+        self.pick_layer.reset_choices()
+        self.viewer.layers.events.inserted.connect(self.pick_layer.reset_choices)
+        self.viewer.layers.events.removed.connect(self.pick_layer.reset_choices)
+        self.segmentationlayer_group.glayout.addWidget(self.pick_layer.native, 0, 0)
+        self.btn_use_layer_as_segmentation = QPushButton("Use layer as segmentation")
+        self.segmentationlayer_group.glayout.addWidget(self.btn_use_layer_as_segmentation, 1, 0)
+
 
         self.btn_run_segmentation = QPushButton("Run segmentation")
         self.tabs.add_named_tab('Segmentation', self.btn_run_segmentation)
@@ -317,6 +333,7 @@ class MorphoWidget(QWidget):
         self.conv_paint_widget.load_model_btn.clicked.connect(self._on_load_model)
         self.conv_paint_widget.save_model_btn.clicked.connect(self._on_load_model)
         self.btn_run_segmentation.clicked.connect(self._on_run_segmentation)
+        self.btn_use_layer_as_segmentation.clicked.connect(self._on_use_layer_as_segmentation)
         self.btn_run_single_segmentation.clicked.connect(self._on_run_seg_spline)
         self.btn_run_spline_and_window.clicked.connect(self._on_run_spline_and_window)
 
@@ -341,8 +358,10 @@ class MorphoWidget(QWidget):
             self.conv_paint_widget.setVisible(True)
         if self.param.seg_algo != 'precomputed':
             self.segmentation_group.gbox.setVisible(False)
+            self.segmentationlayer_group.gbox.setVisible(False)
         else:
             self.segmentation_group.gbox.setVisible(True)
+            self.segmentationlayer_group.gbox.setVisible(True)
 
         self.param.lambda_ = self.smoothing.value()
         self.param.width = self.width.value()
@@ -485,6 +504,27 @@ class MorphoWidget(QWidget):
         self._on_load_windows()
         export_results_parameters(self.param, self.res)
         self.update_displacement_plot()
+
+    def _on_use_layer_as_segmentation(self):
+        """Use currently selected layer as segmentation."""
+
+        folder_export = self.param.analysis_folder.joinpath('main_segmented')
+        self.param.seg_folder = folder_export
+        self.display_segmentation_folder.setText(str(folder_export))
+        if self.param.analysis_folder is None:
+            raise ValueError('Select an analysis folder first.')
+        if not folder_export.exists():
+            folder_export.mkdir()
+        layer = self.pick_layer.value
+        if layer is None:
+            raise ValueError('Select a layer first.')
+        if layer.data.shape != self.viewer.layers[self.param.morpho_name].data.shape:
+            raise ValueError('Segmentation layer must have same shape as data.')
+        
+        for k in range(layer.data.shape[0]):
+            skimage.io.imsave(
+                folder_export.joinpath(f"segmented_k_{k}.tif"),
+                layer.data[k])
 
 
     def _on_run_segmentation(self):
