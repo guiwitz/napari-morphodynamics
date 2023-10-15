@@ -346,6 +346,7 @@ class MorphoWidget(QWidget):
 
         self.param.lambda_ = self.smoothing.value()
         self.param.width = self.width.value()
+        self.param.depth = self.depth.value()
         if self.segm_channel.currentItem() is not None:
             self.param.morpho_name = self.segm_channel.currentItem().text()
             self.conv_paint_widget.param.channel = self.param.morpho_name
