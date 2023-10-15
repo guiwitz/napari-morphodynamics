@@ -136,7 +136,7 @@ class MorphoWidget(QWidget):
         self.tabs.add_named_tab('Segmentation', self.segoptions_vgroup.gbox)
         # algo choice
         self.seg_algo = QComboBox()
-        self.seg_algo.addItems(['cellpose', 'farid', 'conv_paint', 'precomputed'])
+        self.seg_algo.addItems(['conv_paint', 'cellpose', 'precomputed'])
         self.seg_algo.setCurrentIndex(0)
         self.segoptions_vgroup.glayout.addWidget(QLabel('Algorithm'), 0, 0)
         self.segoptions_vgroup.glayout.addWidget(self.seg_algo, 0, 1)
@@ -145,6 +145,7 @@ class MorphoWidget(QWidget):
         self.cellpose_widget = QGroupBox()
         self.cellpose_layout = QGridLayout()
         self.cellpose_widget.setLayout(self.cellpose_layout)
+        self.cellpose_widget.setVisible(False)
         self.segoptions_vgroup.glayout.addWidget(self.cellpose_widget, 1, 0, 1, 2)
         self.cell_diameter = QSpinBox()
         self.cell_diameter.setValue(20)
@@ -175,8 +176,15 @@ class MorphoWidget(QWidget):
 
         # convpaint options
         self.conv_paint_widget = ConvPaintWidget(self.viewer)
+        self.conv_paint_widget.tabs.setTabVisible(1, False)
+        self.conv_paint_widget.update_model_on_project_btn.hide()
+        self.conv_paint_widget.prediction_all_btn.hide()
+        self.conv_paint_widget.check_use_project.hide()
+        self.conv_paint_widget.check_dims_is_channels.hide()
+        
+
         self.segoptions_vgroup.glayout.addWidget(self.conv_paint_widget, 2, 0, 1, 2)
-        self.conv_paint_widget.setVisible(False)
+        self.conv_paint_widget.setVisible(True)
 
         self.segmentation_group = VHGroup('Use saved segmentation', 'G')
         #segmentation_group.glayout.setAlignment(Qt.AlignTop)
@@ -524,7 +532,7 @@ class MorphoWidget(QWidget):
         for k in range(layer.data.shape[0]):
             skimage.io.imsave(
                 folder_export.joinpath(f"segmented_k_{k}.tif"),
-                layer.data[k])
+                layer.data[k], check_contrast=False)
 
 
     def _on_run_segmentation(self):
