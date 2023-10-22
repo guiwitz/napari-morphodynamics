@@ -10,6 +10,7 @@ from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
 QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,QGroupBox,
 QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
 from qtpy.QtCore import Qt
+from magicgui.widgets import create_widget
 
 import numpy as np
 import napari
@@ -203,7 +204,6 @@ class MorphoWidget(QWidget):
         self.segmentationlayer_group.gbox.setMaximumHeight(150)
         self.segoptions_vgroup.glayout.addWidget(self.segmentationlayer_group.gbox, 4, 0, 1, 2)
 
-        from magicgui.widgets import create_widget
         self.pick_layer = create_widget(annotation=napari.layers.Labels, label='Pick segmentation layer')
         self.pick_layer.reset_choices()
         self.viewer.layers.events.inserted.connect(self.pick_layer.reset_choices)
@@ -255,6 +255,7 @@ class MorphoWidget(QWidget):
         self.tabs.add_named_tab('Display options', QLabel('Window layers'), (0, 0, 1, 1))
         self.tabs.add_named_tab('Display options', self.display_wlayers, (0, 1, 1, 1))
         self.intensity_plot = DataPlotter(self.viewer)
+        self.window_loc_plot = None
         self.tabs.add_named_tab('Display options', self.intensity_plot, (1, 0, 1, 2))
         self.combo_channel = QComboBox()
         self.tabs.add_named_tab('Display options', QLabel('Channel'), (2, 0, 1, 1))
@@ -693,19 +694,27 @@ class MorphoWidget(QWidget):
 
         self.update_intensity_plot()
 
-    def update_intensity_plot(self):
+
+    def _get_current_layer_display(self):
+        """Get current layer display."""
 
         on_list = [int(x.text()) for x in self.display_wlayers.selectedItems()]
+        return on_list
+
+    def update_intensity_plot(self):
+
+        on_list = self._get_current_layer_display()
         if len(on_list) == 0:
             return
         
         channel_index = self.combo_channel.currentIndex()
         self.intensity_plot.axes.clear()
+        self.window_loc_plot = None
         self.intensity_plot.axes.set_title('Intensity')
         self.intensity_plot.axes.set_xlabel('Time')
         self.intensity_plot.axes.set_ylabel('Window')
 
-        signal = self.res.mean[channel_index,on_list[0]]
+        signal = self.res.mean[channel_index, on_list[0]]
         percentile1 = np.percentile(signal[~np.isnan(signal)],1)
         percentile99 = np.percentile(signal[~np.isnan(signal)],99)
         self.intensity_plot.axes.imshow(
@@ -849,6 +858,7 @@ class MorphoWidget(QWidget):
         self.viewer.add_labels(w_image, name='windows')
         self.viewer.layers['windows'].color = col_dict
         self.viewer.layers['windows'].color_mode = 'direct' #needed to refresh the color map
+        self.viewer.layers['windows'].mouse_move_callbacks.append(self._shift_move_callback)
 
         self.display_wlayers.addItems([str(x) for x in self.layer_indices.keys()])
 
@@ -908,6 +918,27 @@ class MorphoWidget(QWidget):
 
         self.seg_algo.setCurrentText(self.param.seg_algo)
         self.cell_diameter.setValue(self.param.diameter)
+
+    def _shift_move_callback(self, layer, event):
+        """Receiver for napari.viewer.mouse_move_callbacks, checks for 'Shift' event modifier.
+        If event contains 'Shift' and layer attribute contains napari layers the cursor position
+        and value is used to indicate the current position in the window intensity plot.
+        """
+
+        if 'Shift' in event.modifiers:
+            data_coordinates = layer.world_to_data(event.position)
+            val = layer.get_value(data_coordinates)
+
+            on_list = self._get_current_layer_display()
+            val = val -1 - on_list[0] * self.res.mean.shape[2]
+            
+            if self.window_loc_plot is not None:
+                self.window_loc_plot[0].set_data(([data_coordinates[0]], [val]))
+    
+            else:
+                self.window_loc_plot = self.intensity_plot.axes.plot([data_coordinates[0]], [val], 'ro')
+
+            self.intensity_plot.canvas.draw()
 
 def scroll_label(default_text = 'default text'):
     mylabel = QLabel()
