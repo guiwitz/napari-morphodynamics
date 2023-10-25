@@ -70,11 +70,10 @@ class MorphoWidget(QWidget):
         self.setMinimumWidth(400)
 
         self.tab_names = [
-            'Data', 'Segmentation', 'Windowing', 'Display options',
-            'Dask', 'Plots']
+            'Data', 'Segmentation', 'Windowing', 'Display options', 'Dask', 'Plots', 'Correlations']
         self.tabs = TabSet(
             self.tab_names,
-            tab_layouts=[None, None, None, QGridLayout(), None, None]
+            tab_layouts=[None, None, None, QGridLayout(), None, None, QGridLayout()]
         )
 
         self.main_layout.addWidget(self.tabs)
@@ -300,13 +299,24 @@ class MorphoWidget(QWidget):
         #self._paint_layout.addStretch()
         #self._dask_layout.addStretch()
 
-        #Plot options
+        # Plot options
         self.drop_choose_plot = QComboBox()
         self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature', 'edge overview'])
         self.drop_choose_plot.setCurrentIndex(0)
         self.tabs.add_named_tab('Plots', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
         self.tabs.add_named_tab('Plots', self.displacement_plot)
+
+        # Correlation options
+        self.correlation_plot = DataPlotter(self.viewer)
+        self.tabs.add_named_tab('Correlations', self.correlation_plot, (0, 0, 1, 2))
+        self.combo_channel_correlation1 = QComboBox()
+        self.tabs.add_named_tab('Correlations', QLabel('Channel1'), (1, 0, 1, 1))
+        self.tabs.add_named_tab('Correlations', self.combo_channel_correlation1, (1, 1, 1, 1))
+        self.combo_channel_correlation2 = QComboBox()
+        self.tabs.add_named_tab('Correlations', QLabel('Channel2'), (2, 0, 1, 1))
+        self.tabs.add_named_tab('Correlations', self.combo_channel_correlation2, (2, 1, 1, 1))
+
     
         
 
@@ -331,6 +341,8 @@ class MorphoWidget(QWidget):
 
         self.btn_load_analysis.clicked.connect(self._on_load_analysis)
         self.combo_channel.currentIndexChanged.connect(self.update_intensity_plot)
+        self.combo_channel_correlation1.currentIndexChanged.connect(self.update_correlation_plot)
+        self.combo_channel_correlation2.currentIndexChanged.connect(self.update_correlation_plot)
 
         self.file_list.model().rowsInserted.connect(self._on_change_filelist)
         self.cell_diameter.valueChanged.connect(self._on_update_param)
@@ -458,6 +470,8 @@ class MorphoWidget(QWidget):
         self.segm_channel.addItems(channel_list)
         self.signal_channel.addItems(channel_list)
         self.combo_channel.addItems(channel_list)
+        #self.combo_channel_correlation1.addItems(self.param.signal_name)
+        #self.combo_channel_correlation2.addItems(self.param.signal_name)
         self._on_update_param()
 
     def _on_load_model(self):
@@ -468,6 +482,8 @@ class MorphoWidget(QWidget):
 
         self.display_wlayers.clear()
         self.combo_channel.clear()
+        self.combo_channel_correlation1.clear()
+        self.combo_channel_correlation2.clear()
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -678,6 +694,8 @@ class MorphoWidget(QWidget):
         self.data, self.param = dataset_from_param(self.param)
         self.create_stacks()
         self.combo_channel.addItems(self.data.channel_name)
+        self.combo_channel_correlation1.addItems(self.param.signal_name+['displacement'])
+        self.combo_channel_correlation2.addItems(self.param.signal_name)
 
     def _on_display_wlayers_selection_changed(self):
         """Hide/reveal window layers."""
@@ -723,6 +741,34 @@ class MorphoWidget(QWidget):
             vmax=percentile99)
         self.intensity_plot.canvas.figure.canvas.draw()
 
+    def update_correlation_plot(self):
+            
+        on_list = self._get_current_layer_display()
+        if len(on_list) == 0:
+            return
+
+        channel_value1 = self.combo_channel_correlation1.currentText()
+        channel_index1 = self.combo_channel_correlation1.currentIndex()
+        channel_index2 = self.combo_channel_correlation2.currentIndex()
+
+        if channel_value1 == 'displacement':
+            signal1 = self.res.displacement
+            signal2 = self.res.mean[channel_index2, on_list[0]][:, :-1]
+        else:
+            signal1 = self.res.mean[channel_index1, on_list[0]]
+            signal2 = self.res.mean[channel_index2, on_list[0]]
+
+        from morphodynamics.plots.show_plots import show_correlation_core
+        from morphodynamics.correlation import correlate_arrays
+        c = correlate_arrays(signal1, signal2, 'Pearson')
+        
+        self.correlation_plot.canvas.figure.clear()
+        fig = self.correlation_plot.canvas.figure
+        ax = self.correlation_plot.canvas.figure.subplots()
+        show_correlation_core(c, signal1, signal2, 'signal1', 'signal2', 'Pearson', fig_ax=(fig, ax))
+        self.correlation_plot.canvas.figure.canvas.draw()
+
+
     def update_displacement_plot(self):
 
         from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature, show_edge_overview
@@ -737,7 +783,7 @@ class MorphoWidget(QWidget):
             show_curvature(self.data, self.res, fig_ax=(fig, ax),show_colorbar=False)
         elif self.drop_choose_plot.currentText() == 'edge overview':
             show_edge_overview(param=self.param, data=self.data, res=self.res, fig_ax=(fig, ax), lw=0.8)
-        else:
+        elif self.drop_choose_plot.currentText() == 'cumulative displacement':
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
         self.displacement_plot.canvas.figure.canvas.draw()
         
@@ -866,6 +912,8 @@ class MorphoWidget(QWidget):
         """Load existing output of analysis"""
         self.display_wlayers.clear()
         self.combo_channel.clear()
+        self.combo_channel_correlation1.clear()
+        self.combo_channel_correlation2.clear()
         
         if self.analysis_path is None:
             self._on_click_select_analysis()
@@ -892,6 +940,8 @@ class MorphoWidget(QWidget):
         self.segm_channel.item(self.data.channel_name.index(self.param.morpho_name)).setSelected(True)
         self.signal_channel.addItems(self.data.channel_name)
         self.combo_channel.addItems(self.data.channel_name)
+        self.combo_channel_correlation1.addItems(self.param.signal_name+['displacement'])
+        self.combo_channel_correlation2.addItems(self.param.signal_name)
 
         for i in range(len(self.param.signal_name)):
             self.signal_channel.item(self.data.channel_name.index(self.param.signal_name[i])).setSelected(True)
