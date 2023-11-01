@@ -469,9 +469,6 @@ class MorphoWidget(QWidget):
         self.signal_channel.clear()
         self.segm_channel.addItems(channel_list)
         self.signal_channel.addItems(channel_list)
-        self.combo_channel.addItems(channel_list)
-        #self.combo_channel_correlation1.addItems(self.param.signal_name)
-        #self.combo_channel_correlation2.addItems(self.param.signal_name)
         self._on_update_param()
 
     def _on_load_model(self):
@@ -481,9 +478,6 @@ class MorphoWidget(QWidget):
         """Run full morphodynamics analysis"""
 
         self.display_wlayers.clear()
-        self.combo_channel.clear()
-        self.combo_channel_correlation1.clear()
-        self.combo_channel_correlation2.clear()
 
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
@@ -558,7 +552,10 @@ class MorphoWidget(QWidget):
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
         
-        model = None
+        if self.param.random_forest is None:
+            if self.conv_paint_widget.param.random_forest is None:
+                self.conv_paint_widget.save_model()
+            self.param.random_forest = self.conv_paint_widget.param.random_forest
 
         if self.check_use_dask.isChecked():
             with Client(self.cluster) as client:
