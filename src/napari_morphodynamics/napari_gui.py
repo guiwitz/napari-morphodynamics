@@ -84,7 +84,7 @@ class MorphoWidget(QWidget):
 
         # files
         self.qcombobox_data_type = QComboBox()
-        self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nd2', 'h5', 'nparray'])
+        self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nparray'])
         self.data_vgroup.glayout.addWidget(self.qcombobox_data_type, 0, 0, 1, 1)
         self.btn_select_file_folder = QPushButton("Select data folder")
         self.data_vgroup.glayout.addWidget(self.btn_select_file_folder)
