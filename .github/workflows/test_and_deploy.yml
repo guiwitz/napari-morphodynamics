@@ -23,13 +23,13 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: [3.8, 3.9]
+        python-version: [3.9, "3.10"]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -40,7 +40,7 @@ jobs:
       - name: Install Windows OpenGL
         if: runner.os == 'Windows'
         run: |
-          git clone --depth 1 git://github.com/pyvista/gl-ci-helpers.git
+          git clone --depth 1 https://github.com/pyvista/gl-ci-helpers.git
           powershell gl-ci-helpers/appveyor/install_opengl.ps1
       # note: if you need dependencies from conda, considering using
       # setup-miniconda: https://github.com/conda-incubator/setup-miniconda
@@ -69,9 +69,9 @@ jobs:
     runs-on: ubuntu-latest
     if: contains(github.ref, 'tags')
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: "3.x"
       - name: Install dependencies
