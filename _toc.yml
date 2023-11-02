@@ -1,6 +1,11 @@
 format: jb-book
-root: README
-chapters:
-  - file: book/Description
-  - file: book/installation
-  - file: book/step-by-step
+root: book/Landing
+
+parts:
+  - caption: Getting started
+    chapters:
+    - file: book/Description
+    - file: book/Installation
+  - caption: Examples
+    chapters:
+    - file: book/Standard_workflow
