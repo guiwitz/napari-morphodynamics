@@ -84,7 +84,7 @@ class MorphoWidget(QWidget):
 
         # files
         self.qcombobox_data_type = QComboBox()
-        self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nparray'])
+        self.qcombobox_data_type.addItems(['zarr', 'multipage_tiff', 'tiff_series', 'nparray', 'layers'])
         self.data_vgroup.glayout.addWidget(self.qcombobox_data_type, 0, 0, 1, 1)
         self.btn_select_file_folder = QPushButton("Select data folder")
         self.data_vgroup.glayout.addWidget(self.btn_select_file_folder)
@@ -448,7 +448,19 @@ class MorphoWidget(QWidget):
             self.file_list.setCurrentRow(file_index)
             self.param.data_type = "np"
             self.data, self.param = dataset_from_param(self.param)
-        self._on_load_single_file_data()
+
+        elif self.qcombobox_data_type.currentText() == 'layers':
+            #self.param.data_folder = file_folder
+            #self.file_list.add_elements([x.name for x in self.viewer.layers])
+            #self.param.data_type = "zarr"
+            #self.data, self.param = dataset_from_param(self.param)
+            pass
+
+        # create channel choice
+        if self.qcombobox_data_type.currentText() in ['zarr', 'multipage_tiff', 'tiff_series', 'nparray']:
+            self._on_load_single_file_data()
+        elif self.qcombobox_data_type.currentText() == 'layers':
+            self._on_load_layers()
 
 
     def _on_change_filelist(self):
@@ -465,6 +477,15 @@ class MorphoWidget(QWidget):
     def _on_load_single_file_data(self):
 
         channel_list = self.data.channel_name
+        self.segm_channel.clear()
+        self.signal_channel.clear()
+        self.segm_channel.addItems(channel_list)
+        self.signal_channel.addItems(channel_list)
+        self._on_update_param()
+
+    def _on_load_layers(self):
+            
+        channel_list = [x.name for x in self.viewer.layers]
         self.segm_channel.clear()
         self.signal_channel.clear()
         self.segm_channel.addItems(channel_list)
@@ -552,10 +573,11 @@ class MorphoWidget(QWidget):
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
         
-        if self.param.random_forest is None:
-            if self.conv_paint_widget.param.random_forest is None:
-                self.conv_paint_widget.save_model()
-            self.param.random_forest = self.conv_paint_widget.param.random_forest
+        if self.param.seg_algo == 'convpaint':
+            if self.param.random_forest is None:
+                if self.conv_paint_widget.param.random_forest is None:
+                    self.conv_paint_widget.save_model()
+                self.param.random_forest = self.conv_paint_widget.param.random_forest
 
         if self.check_use_dask.isChecked():
             with Client(self.cluster) as client:
@@ -688,11 +710,44 @@ class MorphoWidget(QWidget):
     def _on_load_dataset(self):
         """Having selected segmentation and signal channels, load the data"""
         
+        if self.qcombobox_data_type.currentText() == 'layers':
+            self._convert_layers_to_zarr()
+
         self.data, self.param = dataset_from_param(self.param)
         self.create_stacks()
         self.combo_channel.addItems(self.data.channel_name)
         self.combo_channel_correlation1.addItems(self.param.signal_name+['displacement'])
         self.combo_channel_correlation2.addItems(self.param.signal_name)
+
+    def _convert_layers_to_zarr(self):
+        """Convert layers selected for segmentation and signal to a zarr file
+        and save it in the analysis folder. At the end re-load data as standard zarr file."""
+
+        segm_layer = self.segm_channel.currentItem().text()
+        signal_layers = [x.text() for x in self.signal_channel.selectedItems()]
+        layers = [segm_layer] + signal_layers
+        # keep unique layers
+        layers = list(set(layers))
+        # get position of layers in global layer list to account for a layer both in segmentation and signal
+        signal_id = [layers.index(x) for x in signal_layers]
+
+        np_array = [self.viewer.layers[x].data for x in layers]
+        np_array = np.array(np_array)
+        import zarr
+        if self.analysis_path is None:
+            self.analysis_path = Path(str(QFileDialog.getExistingDirectory(self, "Select Directory")))
+        z1 = zarr.open(self.analysis_path.joinpath('layer_data.zarr'), mode='w', shape=np_array.shape, chunks=(np_array.shape[0],1,np_array.shape[-2], np_array.shape[-1]))
+        z1[:] = np_array
+        self.viewer.layers.clear()
+
+        self.qcombobox_data_type.setCurrentText('zarr')
+        self._on_click_select_file_folder(file_folder=self.analysis_path.joinpath('layer_data.zarr'))
+
+        self.segm_channel.setCurrentRow(0)
+        for i in signal_id:
+            self.signal_channel.item(i).setSelected(True)
+        
+        self._on_click_select_analysis(analysis_path=self.analysis_path)
 
     def _on_display_wlayers_selection_changed(self):
         """Hide/reveal window layers."""
@@ -958,6 +1013,7 @@ class MorphoWidget(QWidget):
         
         #plots
         self.update_displacement_plot()
+        self.update_correlation_plot()
         
 
     def _on_update_interface(self):
