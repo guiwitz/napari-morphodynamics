@@ -32,6 +32,9 @@ from morphodynamics.analysis_par import (
     analyze_morphodynamics, segment_single_frame, 
     compute_spline_windows, segment_and_track, spline_and_window)
 from morphodynamics.windowing import label_windows
+from morphodynamics.plots.show_plots import show_correlation_core
+from morphodynamics.correlation import correlate_arrays
+
 from napari_convpaint.conv_paint import ConvPaintWidget
 from napari_convpaint.conv_paint_utils import Classifier
 
@@ -70,10 +73,10 @@ class MorphoWidget(QWidget):
         self.setMinimumWidth(400)
 
         self.tab_names = [
-            'Data', 'Segmentation', 'Windowing', 'Display options', 'Dask', 'Plots', 'Correlations']
+            'Data', 'Segmentation', 'Windowing', 'Signal', 'Morpho', 'Correlations', 'Dask']
         self.tabs = TabSet(
             self.tab_names,
-            tab_layouts=[None, None, None, QGridLayout(), None, None, QGridLayout()]
+            tab_layouts=[None, None, None, QGridLayout(), None, QGridLayout(), None]
         )
 
         self.main_layout.addWidget(self.tabs)
@@ -251,14 +254,14 @@ class MorphoWidget(QWidget):
         self.display_wlayers = QListWidget()
         self.display_wlayers.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.display_wlayers.itemSelectionChanged.connect(self._on_display_wlayers_selection_changed)
-        self.tabs.add_named_tab('Display options', QLabel('Window layers'), (0, 0, 1, 1))
-        self.tabs.add_named_tab('Display options', self.display_wlayers, (0, 1, 1, 1))
+        self.tabs.add_named_tab('Signal', QLabel('Window layers'), (0, 0, 1, 1))
+        self.tabs.add_named_tab('Signal', self.display_wlayers, (0, 1, 1, 1))
+        self.combo_channel = QComboBox()
+        self.tabs.add_named_tab('Signal', QLabel('Channel'), (1, 0, 1, 1))
+        self.tabs.add_named_tab('Signal', self.combo_channel, (1, 1, 1, 1))
         self.intensity_plot = DataPlotter(self.viewer)
         self.window_loc_plot = None
-        self.tabs.add_named_tab('Display options', self.intensity_plot, (1, 0, 1, 2))
-        self.combo_channel = QComboBox()
-        self.tabs.add_named_tab('Display options', QLabel('Channel'), (2, 0, 1, 1))
-        self.tabs.add_named_tab('Display options', self.combo_channel, (2, 1, 1, 1))
+        self.tabs.add_named_tab('Signal', self.intensity_plot, (2, 0, 1, 2))
 
         # dask options
         dask_group = VHGroup('Dask options', 'G')
@@ -303,9 +306,9 @@ class MorphoWidget(QWidget):
         self.drop_choose_plot = QComboBox()
         self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature', 'edge overview'])
         self.drop_choose_plot.setCurrentIndex(0)
-        self.tabs.add_named_tab('Plots', self.drop_choose_plot)
+        self.tabs.add_named_tab('Morpho', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
-        self.tabs.add_named_tab('Plots', self.displacement_plot)
+        self.tabs.add_named_tab('Morpho', self.displacement_plot)
 
         # Correlation options
         self.correlation_plot = DataPlotter(self.viewer)
@@ -573,7 +576,7 @@ class MorphoWidget(QWidget):
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
         
-        if self.param.seg_algo == 'convpaint':
+        if self.param.seg_algo == 'conv_paint':
             if self.param.random_forest is None:
                 if self.conv_paint_widget.param.random_forest is None:
                     self.conv_paint_widget.save_model()
@@ -791,6 +794,11 @@ class MorphoWidget(QWidget):
             signal,
             vmin=percentile1,
             vmax=percentile99)
+        
+        self.intensity_plot.axes.xaxis.label.set_size(12)
+        self.intensity_plot.axes.yaxis.label.set_size(12)
+        self.intensity_plot.axes.title.set_fontsize(12)
+        self.intensity_plot.axes.tick_params(labelsize=12)
         self.intensity_plot.canvas.figure.canvas.draw()
 
     def update_correlation_plot(self):
@@ -803,21 +811,33 @@ class MorphoWidget(QWidget):
         channel_index1 = self.combo_channel_correlation1.currentIndex()
         channel_index2 = self.combo_channel_correlation2.currentIndex()
 
+        sel_layer = on_list[0]
+
+        signal2_name = self.param.signal_name[channel_index2]
         if channel_value1 == 'displacement':
             signal1 = self.res.displacement
-            signal2 = self.res.mean[channel_index2, on_list[0]][:, :-1]
+            signal2 = self.res.mean[channel_index2, sel_layer][0:self.res.I[sel_layer], :-1]
+            signal1_name = 'displacement'
         else:
-            signal1 = self.res.mean[channel_index1, on_list[0]]
-            signal2 = self.res.mean[channel_index2, on_list[0]]
-
-        from morphodynamics.plots.show_plots import show_correlation_core
-        from morphodynamics.correlation import correlate_arrays
+            signal1 = self.res.mean[channel_index1, sel_layer][0:self.res.I[sel_layer]]
+            signal2 = self.res.mean[channel_index2, sel_layer][0:self.res.I[sel_layer]]
+            signal1_name = self.param.signal_name[channel_index1]
+        
         c = correlate_arrays(signal1, signal2, 'Pearson')
         
         self.correlation_plot.canvas.figure.clear()
         fig = self.correlation_plot.canvas.figure
         ax = self.correlation_plot.canvas.figure.subplots()
-        show_correlation_core(c, signal1, signal2, 'signal1', 'signal2', 'Pearson', fig_ax=(fig, ax))
+        show_correlation_core(
+            corr_signal=c, signal1=signal1, signal2=signal2,
+            signal1_name=signal1_name, signal2_name=signal2_name,
+            normalization='Pearson', fig_ax=(fig, ax))
+        ax.images[0].set_clim(np.percentile(c, [2, 98]))
+        ax.xaxis.label.set_size(12)
+        ax.yaxis.label.set_size(12)
+        ax.title.set_fontsize(12)
+        ax.tick_params(labelsize=12)
+
         self.correlation_plot.canvas.figure.canvas.draw()
 
 
@@ -837,6 +857,11 @@ class MorphoWidget(QWidget):
             show_edge_overview(param=self.param, data=self.data, res=self.res, fig_ax=(fig, ax), lw=0.8)
         elif self.drop_choose_plot.currentText() == 'cumulative displacement':
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
+        
+        ax.xaxis.label.set_size(12)
+        ax.yaxis.label.set_size(12)
+        ax.title.set_fontsize(12)
+        ax.tick_params(labelsize=12)
         self.displacement_plot.canvas.figure.canvas.draw()
         
 
@@ -1040,7 +1065,7 @@ class MorphoWidget(QWidget):
     
             else:
                 self.window_loc_plot = self.intensity_plot.axes.plot([data_coordinates[0]], [val], 'ro')
-
+            
             self.intensity_plot.canvas.draw()
 
 def scroll_label(default_text = 'default text'):
