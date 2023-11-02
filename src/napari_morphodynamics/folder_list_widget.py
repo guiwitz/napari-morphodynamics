@@ -53,6 +53,11 @@ class FolderListWidget(QListWidget):
             if f[0] != '.':
                 self.addItem(f)
 
+    def add_elements(self, elements):
+
+        for element in elements:
+            self.addItem(element)
+
     def select_first_file(self):
         
         self.setCurrentRow(0)
