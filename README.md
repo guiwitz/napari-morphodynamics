@@ -7,22 +7,13 @@
 [![codecov](https://codecov.io/gh/guiwitz/napari-morphodynamics/branch/main/graph/badge.svg)](https://codecov.io/gh/guiwitz/napari-morphodynamics)
 [![napari hub](https://img.shields.io/endpoint?url=https://api.napari-hub.org/shields/napari-morphodynamics)](https://napari-hub.org/plugins/napari-morphodynamics)
 
-**!!!!!!!Plugin under development!!!!!!**
+This plugin offers an interface for the [Morphodynamics](https://github.com/guiwitz/MorphoDynamics) package which allows to study the shape and intra-cellular dynamics of cells imaged as time-lapses by fluorescence microscopy. The plugin offers a single place to perfrom segmentation, windowing (partition cells into small regions of interests that are tracked over time) and results visualization. The software depends on [napari-convpaint](https://github.com/guiwitz/napari-convpaint) a pixel-classifier and/or on [cellpose](https://cellpose.readthedocs.io/en/latest/index.html) for segmentation. 
 
-This plugin offers an interface for the [Morphodynamics](https://github.com/guiwitz/MorphoDynamics) package. It allows to select and visualize time-lapses, choose segmentation algorithm and parameters, train a pixel-classifier based segmentation (via [napari-convpaint](https://github.com/guiwitz/napari-convpaint)) and finally run the morphodynamics analysis (breaking up the segmentation into layered windows, fitting a spline on the contour).
 ## Installation
 
-You can install the plugin via pip with:
-
-```
-pip install git+https://github.com/guiwitz/napari-morphodynamics.git
-```
-
-**Not yet on pypi**
-You can install `napari-morphodynamics` via [pip]:
+You can install the plugin via [pip] with:
 
     pip install napari-morphodynamics
-
 
 To install latest development version :
 
@@ -38,6 +29,10 @@ the coverage at least stays the same before you submit a pull request.
 
 Distributed under the terms of the [BSD-3] license,
 "napari-morphodynamics" is free and open source software
+
+## Authors
+
+This plugin has been developed by Guillaume Witz and Ana Stojiljkovic at the Data Science Lab, University of Bern, in collaboration with Lucien Hinderling and Olivier Pertz from the Pertz Lab, University of Bern. Development has been partially funded by a [Chan Zuckerberg Initiative grant](https://chanzuckerberg.com/science/programs-resources/imaging/napari/napari-morphodynamics-a-plugin-to-quantify-cellular-dynamics/).
 
 ## Issues
 
