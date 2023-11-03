@@ -551,7 +551,7 @@ class MorphoWidget(QWidget):
     def _on_use_layer_as_segmentation(self):
         """Use currently selected layer as segmentation."""
 
-        folder_export = self.param.analysis_folder.joinpath('main_segmented')
+        folder_export = self.param.analysis_folder.joinpath('main_segmentation')
         self.param.seg_folder = folder_export
         self.display_segmentation_folder.setText(str(folder_export))
         if self.param.analysis_folder is None:
@@ -730,7 +730,7 @@ class MorphoWidget(QWidget):
         signal_layers = [x.text() for x in self.signal_channel.selectedItems()]
         layers = [segm_layer] + signal_layers
         # keep unique layers
-        layers = list(set(layers))
+        layers = list(dict.fromkeys(layers))
         # get position of layers in global layer list to account for a layer both in segmentation and signal
         signal_id = [layers.index(x) for x in signal_layers]
 
