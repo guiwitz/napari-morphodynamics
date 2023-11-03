@@ -9,3 +9,6 @@ parts:
   - caption: Examples
     chapters:
     - file: book/Standard_workflow
+  - caption: How to
+    chapters:
+    - file: book/Layer_as_data
