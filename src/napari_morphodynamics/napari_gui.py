@@ -32,7 +32,9 @@ from morphodynamics.analysis_par import (
     analyze_morphodynamics, segment_single_frame, 
     compute_spline_windows, segment_and_track, spline_and_window)
 from morphodynamics.windowing import label_windows
-from morphodynamics.plots.show_plots import show_correlation_core
+from morphodynamics.plots.show_plots import (
+            show_correlation_core, show_displacement, show_cumdisplacement,
+            show_curvature, show_edge_overview, show_geometry)
 from morphodynamics.correlation import correlate_arrays
 
 from napari_convpaint.conv_paint import ConvPaintWidget
@@ -304,7 +306,9 @@ class MorphoWidget(QWidget):
 
         # Plot options
         self.drop_choose_plot = QComboBox()
-        self.drop_choose_plot.addItems(['displacement', 'cumulative displacement', 'curvature', 'edge overview'])
+        self.drop_choose_plot.addItems([
+            'displacement', 'cumulative displacement', 'curvature',
+            'area', 'edge overview'])
         self.drop_choose_plot.setCurrentIndex(0)
         self.tabs.add_named_tab('Morpho', self.drop_choose_plot)
         self.displacement_plot = DataPlotter(self.viewer)
@@ -843,8 +847,6 @@ class MorphoWidget(QWidget):
 
     def update_displacement_plot(self):
 
-        from morphodynamics.plots.show_plots import show_displacement, show_cumdisplacement, show_curvature, show_edge_overview
-        
         self.displacement_plot.canvas.figure.clear()
             
         fig = self.displacement_plot.canvas.figure
@@ -857,7 +859,9 @@ class MorphoWidget(QWidget):
             show_edge_overview(param=self.param, data=self.data, res=self.res, fig_ax=(fig, ax), lw=0.8)
         elif self.drop_choose_plot.currentText() == 'cumulative displacement':
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
-        
+        elif self.drop_choose_plot.currentText() == 'area':
+            show_geometry(self.data, self.res, prop='area', title='Area [px]', fig_ax=(fig, ax))
+
         ax.xaxis.label.set_size(12)
         ax.yaxis.label.set_size(12)
         ax.title.set_fontsize(12)
