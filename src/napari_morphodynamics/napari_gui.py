@@ -594,6 +594,9 @@ class MorphoWidget(QWidget):
     def _on_run_segmentation(self):
         """Run segmentation."""
 
+        if self.analysis_path is None:
+            self._on_click_select_analysis()
+            
         if self.cluster is None and self.check_use_dask.isChecked():
             self.initialize_dask()
         
