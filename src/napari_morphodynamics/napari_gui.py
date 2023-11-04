@@ -861,7 +861,9 @@ class MorphoWidget(QWidget):
             show_cumdisplacement(self.res, fig_ax=(fig, ax))
         elif self.drop_choose_plot.currentText() == 'area':
             show_geometry(self.data, self.res, prop='area', title='Area [px]', fig_ax=(fig, ax))
-
+            ax.set_xlabel('Time [frame]')
+            ax.set_ylabel('Area [px]')
+            
         ax.xaxis.label.set_size(12)
         ax.yaxis.label.set_size(12)
         ax.title.set_fontsize(12)
