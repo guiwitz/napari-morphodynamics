@@ -12,3 +12,4 @@ parts:
   - caption: How to
     chapters:
     - file: book/Layer_as_data
+    - file: book/Reshaping_data
