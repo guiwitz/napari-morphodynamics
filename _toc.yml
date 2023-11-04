@@ -13,3 +13,4 @@ parts:
     chapters:
     - file: book/Layer_as_data
     - file: book/Reshaping_data
+    - file: book/Multi_cell
