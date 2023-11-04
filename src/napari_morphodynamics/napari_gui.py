@@ -216,6 +216,10 @@ class MorphoWidget(QWidget):
         self.btn_use_layer_as_segmentation = QPushButton("Use layer as segmentation")
         self.segmentationlayer_group.glayout.addWidget(self.btn_use_layer_as_segmentation, 1, 0)
 
+        self.check_use_location = QCheckBox('Select cell')
+        self.check_use_location.setChecked(False)
+        self.check_use_location.stateChanged.connect(self._on_update_cell_location)
+        self.tabs.add_named_tab('Segmentation', self.check_use_location)
 
         self.btn_run_segmentation = QPushButton("Run segmentation")
         self.tabs.add_named_tab('Segmentation', self.btn_run_segmentation)
@@ -414,6 +418,19 @@ class MorphoWidget(QWidget):
         if self.display_segmentation_folder.text() != 'No selection.':
             self.param.seg_folder = Path(self.display_segmentation_folder.text())
         self.param.diameter = self.cell_diameter.value()
+
+    def _on_update_cell_location(self, event=None):
+
+        if self.check_use_location.isChecked():
+            if 'select cell' not in self.viewer.layers:
+                self.viewer.add_points(
+                    np.array([[0]+list(self.data.dims)]) // 2, size=10, face_color='red', name='select cell')
+                self.viewer.layers['select cell'].events.data.connect(self._on_update_cell_location)
+            self.param.location = list(self.viewer.layers['select cell'].data[0][-2::])
+        else:
+            if 'select cell' in self.viewer.layers:
+                self.viewer.layers.remove('select cell')
+            self.param.location = None
 
     def _on_click_select_file_folder(self, event=None, file_folder=None):
         """Interactively select folder to analyze"""
@@ -863,7 +880,7 @@ class MorphoWidget(QWidget):
             show_geometry(self.data, self.res, prop='area', title='Area [px]', fig_ax=(fig, ax))
             ax.set_xlabel('Time [frame]')
             ax.set_ylabel('Area [px]')
-            
+
         ax.xaxis.label.set_size(12)
         ax.yaxis.label.set_size(12)
         ax.title.set_fontsize(12)
