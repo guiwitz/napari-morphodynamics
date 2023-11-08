@@ -1,5 +1,5 @@
 name: napari-morphodynamics
-display_name: MorphoPlugin
+display_name: napari-morphodynamics
 contributions:
   commands:
     - id: napari-morphodynamics.make_qwidget
