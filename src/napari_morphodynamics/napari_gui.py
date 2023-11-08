@@ -832,31 +832,18 @@ class MorphoWidget(QWidget):
             return
 
         channel_value1 = self.combo_channel_correlation1.currentText()
-        channel_index1 = self.combo_channel_correlation1.currentIndex()
-        channel_index2 = self.combo_channel_correlation2.currentIndex()
+        channel_value2 = self.combo_channel_correlation2.currentText()
 
         sel_layer = on_list[0]
-
-        signal2_name = self.param.signal_name[channel_index2]
-        if channel_value1 == 'displacement':
-            signal1 = self.res.displacement
-            signal2 = self.res.mean[channel_index2, sel_layer][0:self.res.I[sel_layer], :-1]
-            signal1_name = 'displacement'
-        else:
-            signal1 = self.res.mean[channel_index1, sel_layer][0:self.res.I[sel_layer]]
-            signal2 = self.res.mean[channel_index2, sel_layer][0:self.res.I[sel_layer]]
-            signal1_name = self.param.signal_name[channel_index1]
-        
-        c = correlate_arrays(signal1, signal2, 'Pearson')
         
         self.correlation_plot.canvas.figure.clear()
         fig = self.correlation_plot.canvas.figure
         ax = self.correlation_plot.canvas.figure.subplots()
         show_correlation_core(
-            corr_signal=c, signal1=signal1, signal2=signal2,
-            signal1_name=signal1_name, signal2_name=signal2_name,
+            res=self.res, param=self.param, signal1_name=channel_value1,
+            signal2_name=channel_value2,
+            window_layer=sel_layer,
             normalization='Pearson', fig_ax=(fig, ax))
-        ax.images[0].set_clim(np.percentile(c, [2, 98]))
         ax.xaxis.label.set_size(12)
         ax.yaxis.label.set_size(12)
         ax.title.set_fontsize(12)
