@@ -8,7 +8,7 @@ from itertools import cycle
 from pathlib import Path
 from qtpy.QtWidgets import (QWidget, QPushButton, QSpinBox, QDoubleSpinBox,
 QVBoxLayout, QLabel, QComboBox, QCheckBox, QGridLayout,QGroupBox,
-QListWidget, QFileDialog, QScrollArea, QAbstractItemView)
+QListWidget, QFileDialog, QScrollArea, QAbstractItemView, QScrollArea)
 from qtpy.QtCore import Qt
 from magicgui.widgets import create_widget
 
@@ -138,7 +138,12 @@ class MorphoWidget(QWidget):
         # segmentation tab
         self.segoptions_vgroup = VHGroup('Set segmentation parameters', orientation='G')
         self.segoptions_vgroup.glayout.setAlignment(Qt.AlignTop)
-        self.tabs.add_named_tab('Segmentation', self.segoptions_vgroup.gbox)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(self.segoptions_vgroup.gbox)
+        self.tabs.add_named_tab('Segmentation', scroll)
+
         # algo choice
         self.seg_algo = QComboBox()
         self.seg_algo.addItems(['conv_paint', 'cellpose', 'precomputed'])
@@ -184,9 +189,7 @@ class MorphoWidget(QWidget):
         self.conv_paint_widget.tabs.setTabVisible(1, False)
         self.conv_paint_widget.update_model_on_project_btn.hide()
         self.conv_paint_widget.prediction_all_btn.hide()
-        self.conv_paint_widget.check_use_project.hide()
-        self.conv_paint_widget.check_dims_is_channels.hide()
-        
+        self.conv_paint_widget.check_use_project.hide()        
 
         self.segoptions_vgroup.glayout.addWidget(self.conv_paint_widget, 2, 0, 1, 2)
         self.conv_paint_widget.setVisible(True)
