@@ -185,7 +185,7 @@ class MorphoWidget(QWidget):
         #self.segoptions_vgroup.glayout.addWidget(self.cellpose_cellprob_threshold, 3, 1, 1, 1)
 
         # convpaint options
-        self.conv_paint_widget = ConvPaintWidget(self.viewer)
+        self.conv_paint_widget = ConvPaintWidget(self.viewer, third_party=True)
         self.conv_paint_widget.tabs.setTabVisible(1, False)
         self.conv_paint_widget.update_model_on_project_btn.hide()
         self.conv_paint_widget.prediction_all_btn.hide()
@@ -642,7 +642,9 @@ class MorphoWidget(QWidget):
             image_path = save_path.joinpath(f"tracked_k_{k}.tif")  
             mask_list.append(skimage.io.imread(image_path))
         mask_list = np.stack(mask_list, axis=0)
-        self.viewer.add_labels(mask_list, name='segmentation')
+        if self.param.seg_algo == 'conv_paint':
+            self.viewer.layers.remove('segmentation')
+            self.viewer.add_labels(mask_list, name='segmentation')
 
 
     def _on_run_seg_spline(self):
