@@ -38,7 +38,7 @@ from morphodynamics.plots.show_plots import (
 from morphodynamics.correlation import correlate_arrays
 
 from napari_convpaint.conv_paint import ConvPaintWidget
-from napari_convpaint.conv_paint_utils import Classifier
+from napari_convpaint.conv_paint_classifier import Classifier
 
 import matplotlib as mpl
 
